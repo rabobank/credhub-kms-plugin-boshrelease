@@ -88,7 +88,7 @@ func (g *Plugin) Version(ctx context.Context, request *pb.VersionRequest) (*pb.V
 
 func (g *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.EncryptResponse, error) {
 	log.Infof("encrypting, plaintext length: %d", len(request.Plain))
-	response, err := encryptString(string(request.Plain))
+	response, err := encryptBytes(request.Plain)
 	if err != nil {
 		log.Errorf("failed to encrypt, plaint text length %d, error: %v", len(request.Plain), err)
 		return nil, err
@@ -98,7 +98,7 @@ func (g *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.E
 
 func (g *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.DecryptResponse, error) {
 	log.Infof("decrypting, cipher length: %d", len(request.Cipher))
-	plainText, err := decryptString(string(request.Cipher))
+	plainText, err := decryptBytes(request.Cipher)
 	if err != nil {
 		log.Errorf("failed to decrypt, plaint text length %d, error: %v", len(request.Cipher), err)
 		return nil, err
@@ -117,15 +117,12 @@ func (g *Plugin) cleanSockFile() error {
 	return nil
 }
 
-func encryptString(stringToEncrypt string) (string, error) {
+func encryptBytes(bytesToEncrypt []byte) (string, error) {
 	var encryptedString string
-	if len(stringToEncrypt) == 0 {
+	if len(bytesToEncrypt) == 0 {
 		return "", nil
 	}
 	key, _ := hex.DecodeString(hex.EncodeToString([]byte(encryptKey)))
-
-	//Since the key is in string, we need to convert decode it to bytes
-	plaintext := []byte(stringToEncrypt)
 
 	//Create a new Cipher Block from the key
 	block, err := aes.NewCipher(key)
@@ -147,18 +144,18 @@ func encryptString(stringToEncrypt string) (string, error) {
 
 	//Encrypt the data using aesGCM.Seal
 	//Since we don't want to save the nonce somewhere else in this case, we add it as a prefix to the encrypted data. The first nonce argument in Seal is the prefix.
-	ciphertext := aesGCM.Seal(nonce, nonce, plaintext, nil)
+	ciphertext := aesGCM.Seal(nonce, nonce, bytesToEncrypt, nil)
 	encryptedString = fmt.Sprintf("%x", ciphertext)
 	return encryptedString, nil
 }
 
-func decryptString(encryptedString string) (string, error) {
+func decryptBytes(encryptedBytes []byte) (string, error) {
 	var decryptedString string
-	if len(encryptedString) == 0 {
+	if len(encryptedBytes) == 0 {
 		return "", nil
 	}
 	key, _ := hex.DecodeString(hex.EncodeToString([]byte(encryptKey)))
-	enc, _ := hex.DecodeString(encryptedString)
+	enc, _ := hex.DecodeString(string(encryptedBytes))
 
 	//Create a new Cipher Block from the key
 	block, err := aes.NewCipher(key)
