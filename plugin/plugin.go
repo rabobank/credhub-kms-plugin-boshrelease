@@ -88,6 +88,7 @@ func (g *Plugin) Version(ctx context.Context, request *pb.VersionRequest) (*pb.V
 }
 
 func (g *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.EncryptResponse, error) {
+	_ = ctx // get rid of compile warnings
 	log.Infof("encrypting, plaintext length: %d", len(request.Plain))
 	response, err := encryptBytes(request.Plain, g.credhubEncryptionKey)
 	if err != nil {
@@ -98,6 +99,7 @@ func (g *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.E
 }
 
 func (g *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.DecryptResponse, error) {
+	_ = ctx // get rid of compile warnings
 	log.Infof("decrypting, cipher length: %d", len(request.Cipher))
 	plainText, err := decryptBytes(request.Cipher, g.credhubEncryptionKey)
 	if err != nil {
