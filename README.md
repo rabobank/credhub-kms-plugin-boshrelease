@@ -1,6 +1,6 @@
 # credhub-kms-plugin
 
-Encrypts/decrypts credentials using an encryption key stored in AWS KMS or Azure keyvault.
+Encrypts/decrypts credentials using an encryption key stored in Azure keyvault (and AWS Secrets Manager, TODO).
 
 # Generate the protobuf code
 ```bash
@@ -19,10 +19,46 @@ git clone https://github.com/rabobank/credhub-kms-plugin $GOPATH/src/github.com/
 cd $GOPATH/src/github.com/rabobank/credhub-kms-plugin
 go build
 ./scripts/setup_dev_grpc_certs.sh   # generate grpc certs
-./credhub-kms-plugin -logtostderr -stderrthreshold=0 -socket kms-plugin.sock -public-key-file grpc-kms-certs/grpc_kms_server_cert.pem -private-key-file grpc-kms-certs/grpc_kms_server_key.pem &
+./credhub-kms-plugin -logtostderr -stderrthreshold=0 -socket kms-plugin.sock -public-key-file grpc-kms-certs/grpc_kms_server_cert.pem -private-key-file grpc-kms-certs/grpc_kms_server_key.pem  -az-tenant-id=<tenantd-id>> -az-keyvault-name=<keyvault name> -az-keyvault-secret-name=<secret name>
 ```
 
 # Deploying
 If deployed on Azure, and you are using a Managed Identity (assigned to the VM):
 * you have to set the environment variable `AZURE_TENANT_ID` or `AZURE_TENANT_ID_FILE` to the tenant id of the Azure subscription.
 * if your VM has multiple Managed Identities assigned, you have to specify the environment variable `AZURE_CLIENT_ID` or `AZURE_CLIENT_ID_FILE` to the client id of the Managed Identity you want to use.
+
+Run `./credhub-kms-plugin -h` for more information about all the options.  
+Example invocation for an Azure environment:
+```bash
+./credhub-kms-plugin \
+ -az-tenant-id=<tenantd-id>> \
+ -az-keyvault-name=<keyvault name> \
+ -az-keyvault-secret-name=<secret name> \
+ -socket /var/vcap/sys/run/credhub-kms-plugin/kms-plugin.sock \
+ -public-key-file kms_server_cert.pem \
+ -private-key-file kms_server_key.pem
+```
+
+# Switching between credhub providers
+The interface between credhub and the kms-plugin does not pass the nonce that is used by the internal provider. This means that the plugin cannot decrypt values that were encrypted by the internal provider.  
+Steps you can take to switch providers:
+* deploy kms plugin (use [a BOSH release for that](https://github.com/vmware-archive/sample-credhub-kms-plugin-release/tree/main))
+* create a credhub backup, just to be sure (you can make a mysqldump of the cf credhub database)
+* run a credhub export, saving the output to a file that you can later use to import again (you do lose entry versions though)
+* stop all but one credhub instance (we assume you can afford this decreased availability)
+* make sure nobody else uses credhub (yes, we again assume this has impact on availability)
+* delete all credhub entries: 
+```bash
+#! /bin/bash
+#
+for E in $(credhub export -p / | grep '\- name:' | awk '{print $NF}')
+do
+  credhub d -n $E
+done
+```
+* also on the cf database server:  ``delete from encryption_key_canary`` (it looks this is used during startup of credhub, and it will fail when you first run with your kms-plugin)
+* start credhub
+* check credhub.log
+* credhub import all the entries, using the yml file you created earlier
+* test: ``cf cs credhub default credhub-plugin-test -c '{"testcredentialP":"testsecretP"}'``
+* start the other credhub instances
