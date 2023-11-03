@@ -25,25 +25,26 @@ import (
 const (
 	netProtocol    = "unix"
 	apiVersion     = "v1beta1"
-	runtime        = "Sample CredHub KMS"
+	runtime        = "CredHub KMS Plugin"
 	runtimeVersion = "0.0.1"
-	encryptKey     = "x5ZcqmHv5r8jt8wYIzm6emLMqwi2wB32"
 )
 
 type Plugin struct {
 	pathToUnixSocket     string
 	pathToPublicKeyFile  string
 	pathToPrivateKeyFile string
+	credhubEncryptionKey string
 	net.Listener
 	*grpc.Server
 }
 
-func New(pathToUnixSocketFile string, publicKeyFile string, privateKeyFile string) (*Plugin, error) {
-	plugin := new(Plugin)
-	plugin.pathToUnixSocket = pathToUnixSocketFile
-	plugin.pathToPublicKeyFile = publicKeyFile
-	plugin.pathToPrivateKeyFile = privateKeyFile
-	return plugin, nil
+func New(pathToUnixSocketFile string, publicKeyFile string, privateKeyFile string, credhubEncryptionKey string) (*Plugin, error) {
+	plgin := new(Plugin)
+	plgin.pathToUnixSocket = pathToUnixSocketFile
+	plgin.pathToPublicKeyFile = publicKeyFile
+	plgin.pathToPrivateKeyFile = privateKeyFile
+	plgin.credhubEncryptionKey = credhubEncryptionKey
+	return plgin, nil
 }
 
 func (g *Plugin) Start() {
@@ -88,7 +89,7 @@ func (g *Plugin) Version(ctx context.Context, request *pb.VersionRequest) (*pb.V
 
 func (g *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.EncryptResponse, error) {
 	log.Infof("encrypting, plaintext length: %d", len(request.Plain))
-	response, err := encryptBytes(request.Plain)
+	response, err := encryptBytes(request.Plain, g.credhubEncryptionKey)
 	if err != nil {
 		log.Errorf("failed to encrypt, plaint text length %d, error: %v", len(request.Plain), err)
 		return nil, err
@@ -98,7 +99,7 @@ func (g *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.E
 
 func (g *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.DecryptResponse, error) {
 	log.Infof("decrypting, cipher length: %d", len(request.Cipher))
-	plainText, err := decryptBytes(request.Cipher)
+	plainText, err := decryptBytes(request.Cipher, g.credhubEncryptionKey)
 	if err != nil {
 		log.Errorf("failed to decrypt, plaint text length %d, error: %v", len(request.Cipher), err)
 		return nil, err
@@ -117,7 +118,7 @@ func (g *Plugin) cleanSockFile() error {
 	return nil
 }
 
-func encryptBytes(bytesToEncrypt []byte) (string, error) {
+func encryptBytes(bytesToEncrypt []byte, encryptKey string) (string, error) {
 	var encryptedString string
 	if len(bytesToEncrypt) == 0 {
 		return "", nil
@@ -149,7 +150,7 @@ func encryptBytes(bytesToEncrypt []byte) (string, error) {
 	return encryptedString, nil
 }
 
-func decryptBytes(encryptedBytes []byte) (string, error) {
+func decryptBytes(encryptedBytes []byte, encryptKey string) (string, error) {
 	var decryptedString string
 	if len(encryptedBytes) == 0 {
 		return "", nil
