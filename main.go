@@ -54,7 +54,7 @@ func main() {
 			os.Exit(1)
 		}
 		var err error
-		if credhubEncryptionKey, err = az.GetSecret(azTenantId, azKeyvaultName, azKeyvaultSecretName); err != nil {
+		if credhubEncryptionKey, err = pluginazure.GetSecret(azKeyvaultName, azKeyvaultSecretName); err != nil {
 			log.Fatalf("failed to get credhub encryption key from Azure keyvault %s: %v", azKeyvaultName, err)
 		} else {
 			log.Infof("got credhub encryption key from Azure keyvault %s", azKeyvaultName)

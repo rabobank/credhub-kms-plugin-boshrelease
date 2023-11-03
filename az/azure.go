@@ -1,4 +1,4 @@
-package az
+package pluginazure
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets"
 )
 
-func GetSecret(tenantID, keyVaultName, secretName string) (string, error) {
+func GetSecret(keyVaultName, secretName string) (string, error) {
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
 		return "", errors.New(fmt.Sprintf("failed to obtain a default Azure credential: %v", err))
