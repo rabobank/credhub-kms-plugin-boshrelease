@@ -62,3 +62,16 @@ done
 * credhub import all the entries, using the yml file you created earlier
 * test: ``cf cs credhub default credhub-plugin-test -c '{"testcredentialP":"testsecretP"}'``
 * start the other credhub instances
+
+
+## Building the BOSH release 
+
+```
+cd ~/workspace
+git clone https://github.com/cloudfoundry/bosh-package-golang-release.git
+git clone <this repo>
+cd credhub-kms-plugin-boshrelease
+bosh vendor-package golang-1.21-linux ../bosh-package-golang-release
+bosh create-release --final --version=0.0.1 --force
+bosh upload-release
+```
