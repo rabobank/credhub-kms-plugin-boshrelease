@@ -5,27 +5,30 @@ LOG_DIR=/var/vcap/sys/log/credhub-kms-plugin
 SOCKET_DIR=/var/vcap/sys/run/credhub-kms-plugin
 PIDFILE=${RUN_DIR}/pid
 
-case $1 in
+case "${1}" in
   start)
-    mkdir -p $RUN_DIR $LOG_DIR
-    chown -R vcap:vcap $RUN_DIR $LOG_DIR
-    pid_guard ${PIDFILE} "credhub-kms-plugin"
-    echo $$ > ${PIDFILE}
+    mkdir -p "${RUN_DIR}" "${LOG_DIR}"
+    chown -R vcap:vcap "${RUN_DIR}" "${LOG_DIR}"
 
-    exec /var/vcap/packages/credhub-kms-plugin/bin/credhub-kms-plugin \
-      -socket <%= p('credhub-kms-plugin.socket_endpoint') %> \
-      -public-key-file /var/vcap/jobs/credhub-kms-plugin/certs/cert.pem \
-      -private-key-file /var/vcap/jobs/credhub-kms-plugin/certs/private.key \
-      -az-tenant-id <%= p('credhub-kms-plugin.az-tenant-id') %> \
-      -az-keyvault-name <%= p('credhub-kms-plugin.az-keyvault-name') %> \
-      -az-keyvault-secret-name <%= p('credhub-kms-plugin.az-keyvault-secret-name') %> \
-      >> "$LOG_DIR/credhub-kms-plugin.stdout.log" \
-      2>> "$LOG_DIR/credhub-kms-plugin.stderr.log"
+    /sbin/start-stop-daemon \
+      --pidfile "${PIDFILE}" \
+      --make-pidfile \
+      --chuid vcap:vcap \
+      --start \
+      --exec /var/vcap/packages/credhub-kms-plugin/bin/credhub-kms-plugin \
+      --start -- -socket <%= p('credhub-kms-plugin.socket_endpoint') %> \
+                 -public-key-file /var/vcap/jobs/credhub-kms-plugin/certs/cert.pem \
+                 -private-key-file /var/vcap/jobs/credhub-kms-plugin/certs/private.key \
+                 -az-tenant-id <%= p('credhub-kms-plugin.az-tenant-id') %> \
+                 -az-keyvault-name <%= p('credhub-kms-plugin.az-keyvault-name') %> \
+                 -az-keyvault-secret-name <%= p('credhub-kms-plugin.az-keyvault-secret-name') %> \
+                 >> "${LOG_DIR}/credhub-kms-plugin.stdout.log" \
+                 2>> "${LOG_DIR}/credhub-kms-plugin.stderr.log"
     ;;
 
-
   stop)
-    kill_and_wait ${PIDFILE}
+    kill -9 $(cat "${PIDFILE}")
+    rm -f "${PIDFILE}"
     ;;
 
   *)
