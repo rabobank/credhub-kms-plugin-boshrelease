@@ -1,5 +1,8 @@
 ---
 name: credhub-kms-plugin
 
+dependencies:
+- golang-1.21-linux
+
 files:
 - credhub-kms-plugin/**/*

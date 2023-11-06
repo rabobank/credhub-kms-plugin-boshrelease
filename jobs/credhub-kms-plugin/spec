@@ -24,6 +24,15 @@ properties:
   credhub-kms-plugin.private_key:
     description: Private key for TLS
 
+  credhub-kms-plugin.az-tenant-id:
+    description: Azure tenant ID where the keyvault is located
+
+  credhub-kms-plugin.az-keyvault-name:
+    description: Azure keyvault where the credhub encryption key is located
+
+  credhub-kms-plugin.az-keyvault-secret-name:
+    description: Azure keyvault secret name where the credhub encryption key is located
+
   # BPM
   bpm.enabled:
     description: "Enable Bosh Process Manager"
