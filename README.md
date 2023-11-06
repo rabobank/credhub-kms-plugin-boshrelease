@@ -86,7 +86,7 @@ To deploy the plugin, you can use the following bosh operator file:
   value:
     - provider_name: credhub-kms-plugin
       key_properties:
-        encryption_key_name: SampleEncryptionKeyName
+        encryption_key_name: RequiredButNoClueWhy
       active: true
     - provider_name: internal-provider
       key_properties:
@@ -124,8 +124,8 @@ To deploy the plugin, you can use the following bosh operator file:
     properties:
       credhub-kms-plugin:
         socket_endpoint: /var/vcap/sys/run/credhub-kms-plugin/credhub-kms-plugin.sock
-        az-tenant-id: ((azure_ad_tenant_id))
-        az-keyvault-name: d05-credhub-keyvault
+        az-tenant-id: ((azure_tenant_id))
+        az-keyvault-name: my-credhub-keyvault
         az-keyvault-secret-name: credhub-encryption-key
         private_key: ((credhub-kms-plugin.private_key))
         certificate: ((credhub-kms-plugin.certificate))
