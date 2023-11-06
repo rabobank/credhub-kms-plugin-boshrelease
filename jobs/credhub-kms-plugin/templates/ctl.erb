@@ -8,13 +8,10 @@ case $1 in
   start)
     mkdir -p $RUN_DIR $LOG_DIR
     chown -R vcap:vcap $RUN_DIR $LOG_DIR
+    pid_guard ${PIDFILE} "credhub-kms-plugin"
+    echo $$ > ${PIDFILE}
 
-    /sbin/start-stop-daemon \
-      --pidfile "$PIDFILE" \
-      --make-pidfile \
-      --chuid vcap:vcap \
-      --start \
-      --exec /var/vcap/packages/credhub-kms-plugin/bin/credhub-kms-plugin \
+    exec /var/vcap/packages/credhub-kms-plugin/bin/credhub-kms-plugin \
       -socket <%= p('credhub-kms-plugin.socket_endpoint') %> \
       -public-key-file /var/vcap/jobs/credhub-kms-plugin/certs/cert.pem \
       -private-key-file /var/vcap/jobs/credhub-kms-plugin/certs/private.key \
@@ -27,9 +24,12 @@ case $1 in
 
 
   stop)
-    kill -9 `cat $PIDFILE`
-    rm -f $PIDFILE
+    kill_and_wait ${PIDFILE}
     ;;
+
   *)
-    echo "Usage: ctl {start|stop}" ;;
+    echo "Usage: $0 {start|stop}"
+    exit 1
+    ;;
+
 esac
