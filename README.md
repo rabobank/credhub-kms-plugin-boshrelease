@@ -19,7 +19,7 @@ git clone https://github.com/rabobank/credhub-kms-plugin $GOPATH/src/github.com/
 cd $GOPATH/src/github.com/rabobank/credhub-kms-plugin
 go build
 ./scripts/setup_dev_grpc_certs.sh   # generate grpc certs
-./credhub-kms-plugin -logtostderr -stderrthreshold=0 -socket kms-plugin.sock -public-key-file grpc-kms-certs/grpc_kms_server_cert.pem -private-key-file grpc-kms-certs/grpc_kms_server_key.pem  -az-tenant-id=<tenantd-id>> -az-keyvault-name=<keyvault name> -az-keyvault-secret-name=<secret name>
+./credhub-kms-plugin -socket kms-plugin.sock -public-key-file grpc-kms-certs/grpc_kms_server_cert.pem -private-key-file grpc-kms-certs/grpc_kms_server_key.pem -az-tenant-id=<tenantd-id>> -az-keyvault-name=<keyvault name> -az-keyvault-secret-name=<secret name>
 ```
 
 # Deploying
@@ -74,4 +74,59 @@ cd credhub-kms-plugin-boshrelease
 bosh vendor-package golang-1.21-linux ../bosh-package-golang-release
 bosh create-release --final --version=0.0.1 --force
 bosh upload-release
+```
+
+## Manifest updates
+
+To deploy the plugin, you can use the following bosh operator file:
+
+```
+- type: replace
+  path: /instance_groups/name=credhub/jobs/name=credhub/properties/credhub/encryption/keys
+  value:
+    - provider_name: credhub-kms-plugin
+      key_properties:
+        encryption_key_name: SampleEncryptionKeyName
+      active: true
+    - provider_name: internal-provider
+      key_properties:
+        encryption_password: ((credhub_encryption_password))
+      active: false
+- type: replace
+  path: /instance_groups/name=credhub/jobs/name=credhub/properties/credhub/encryption/providers
+  value:
+    - name: credhub-kms-plugin
+      type: kms-plugin
+      connection_properties:
+        endpoint: /var/vcap/sys/run/credhub-kms-plugin/credhub-kms-plugin.sock
+        host: localhost
+        ca: ((credhub-kms-plugin.ca))
+    - name: internal-provider
+      type: internal
+- type: replace
+  path: /variables/-
+  value:
+   name: credhub-kms-plugin
+   options:
+     common_name: localhost
+     is_ca: true
+   type: certificate
+- type: replace
+  path: /releases/-
+  value:
+    name: credhub-kms-plugin
+    version: latest
+- type: replace
+  path: /instance_groups/name=credhub/jobs/-
+  value:
+    name: credhub-kms-plugin
+    release: credhub-kms-plugin
+    properties:
+      credhub-kms-plugin:
+        socket_endpoint: /var/vcap/sys/run/credhub-kms-plugin/credhub-kms-plugin.sock
+        az-tenant-id: ((azure_ad_tenant_id))
+        az-keyvault-name: d05-credhub-keyvault
+        az-keyvault-secret-name: credhub-encryption-key
+        private_key: ((credhub-kms-plugin.private_key))
+        certificate: ((credhub-kms-plugin.certificate))
 ```
