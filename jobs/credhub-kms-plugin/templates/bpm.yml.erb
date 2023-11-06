@@ -1,0 +1,27 @@
+<%=
+  {
+    'processes' => [
+      'name' => 'credhub-kms-plugin',
+      'executable' => '/var/vcap/packages/credhub-kms-plugin/bin/credhub-kms-plugin',
+      'env' => {
+        'RUN_DIR' => '/var/vcap/sys/run/credhub-kms-plugin',
+        'LOG_DIR' => '/var/vcap/sys/log/credhub-kms-plugin',
+        'PIDFILE' => '/var/vcap/sys/run/bpm/credhub-kms-plugin/credhub-kms-plugin.pid'
+      },
+      'args' => [
+        p('credhub-kms-plugin.socket_endpoint'),
+        '/var/vcap/jobs/credhub-kms-plugin/certs/cert.pem',
+        '/var/vcap/jobs/credhub-kms-plugin/certs/private.key',
+      ],
+      'additional_volumes' => [
+        {
+          'path' => File.dirname(p('credhub-kms-plugin.socket_endpoint')),
+          'writable' => true,
+          'allow_executions' => true
+
+        }
+      ]
+    ]
+  }.to_yaml
+%>
+

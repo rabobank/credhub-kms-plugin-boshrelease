@@ -1,0 +1,5 @@
+---
+name: credhub-kms-plugin
+
+files:
+- credhub-kms-plugin/**/*

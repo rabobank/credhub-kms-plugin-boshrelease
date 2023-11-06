@@ -1,0 +1,30 @@
+---
+name: credhub-kms-plugin
+
+templates:
+  ctl.erb: bin/ctl
+  cert.pem.erb: certs/cert.pem
+  private.key.erb: certs/private.key
+
+  # BPM
+  bpm.yml.erb: config/bpm.yml
+
+packages:
+- credhub-kms-plugin
+
+properties:
+
+  credhub-kms-plugin.socket_endpoint:
+    description: socket endpoint to listen to credhub on
+    example: unix:///tmp/socketfile.sock
+
+  credhub-kms-plugin.certificate:
+    description: Certificate for TLS
+
+  credhub-kms-plugin.private_key:
+    description: Private key for TLS
+
+  # BPM
+  bpm.enabled:
+    description: "Enable Bosh Process Manager"
+    default: false
