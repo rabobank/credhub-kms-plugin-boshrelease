@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	pluginaws "github.com/rabobank/credhub-kms-plugin/aws"
 	"github.com/rabobank/credhub-kms-plugin/az"
 	log "github.com/sirupsen/logrus"
 	"os"
@@ -19,7 +20,8 @@ var (
 	azTenantId           string
 	azKeyvaultName       string
 	azKeyvaultSecretName string
-	awsSecretArn         string
+	awsRegion            string
+	awsSecretId          string
 	credhubEncryptionKey string
 )
 
@@ -30,14 +32,15 @@ func main() {
 	flag.StringVar(&azTenantId, "az-tenant-id", "", "Azure Tenant ID where the keyvault is located")
 	flag.StringVar(&azKeyvaultName, "az-keyvault-name", "", "Name of the Azure keyvault that contains the credhub encryption key")
 	flag.StringVar(&azKeyvaultSecretName, "az-keyvault-secret-name", "", "Name of the secret in the Azure keyvault that contains the credhub encryption key")
-	flag.StringVar(&awsSecretArn, "aws-secret-arn", "", "ARN of the secret in AWS Secrets Manager that contains the credhub encryption key")
+	flag.StringVar(&awsSecretId, "aws-secret-id", "", "Name or full ARN of the secret in AWS Secrets Manager that contains the credhub encryption key")
+	flag.StringVar(&awsRegion, "aws-region", "eu-west-1", "AWS region where the secret is located")
 	flag.Parse()
 
 	log.SetFormatter(&log.TextFormatter{FullTimestamp: true, TimestampFormat: time.RFC3339, PadLevelText: true})
 	log.SetOutput(os.Stdout)
 
-	if azKeyvaultName == "" && awsSecretArn == "" {
-		log.Fatal("az-keyvault-name or aws-secret-arn must be specified")
+	if (azKeyvaultName == "" && awsSecretId == "") || (azKeyvaultName != "" && awsSecretId != "") {
+		log.Fatal("az-keyvault-name OR aws-secret-arn must be specified")
 	}
 
 	var initFailed = false
@@ -61,6 +64,19 @@ func main() {
 		}
 		if err := os.Setenv("AZURE_TENANT_ID", azTenantId); err != nil {
 			log.Fatalf("failed to set AZURE_TENANT_ID environment variable: %v", err)
+		}
+	}
+
+	if awsSecretId != "" {
+		var err error
+		if awsRegion == "" {
+			log.Error("aws-region must be specified when using aws-secret-arn")
+			initFailed = true
+		}
+		if credhubEncryptionKey, err = pluginaws.GetSecret(awsRegion, awsSecretId); err != nil {
+			log.Fatalf("failed to get credhub encryption key from AWS Secrets Manager %s: %v", awsSecretId, err)
+		} else {
+			log.Infof("got credhub encryption key from AWS Secrets Manager %s", awsSecretId)
 		}
 	}
 

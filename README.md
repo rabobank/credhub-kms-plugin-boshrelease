@@ -1,6 +1,6 @@
 # credhub-kms-plugin
 
-Encrypts/decrypts credentials using an encryption key stored in Azure keyvault (and AWS Secrets Manager, TODO).
+Encrypts/decrypts credentials using an encryption key stored in Azure keyvault or AWS Secrets Manager.
 
 # Generate the protobuf code
 ```bash
@@ -31,9 +31,18 @@ Run `./credhub-kms-plugin -h` for more information about all the options.
 Example invocation for an Azure environment:
 ```bash
 ./credhub-kms-plugin \
- -az-tenant-id=<tenantd-id>> \
+ -az-tenant-id=<tenant-id> \
  -az-keyvault-name=<keyvault name> \
  -az-keyvault-secret-name=<secret name> \
+ -socket /var/vcap/sys/run/credhub-kms-plugin/kms-plugin.sock \
+ -public-key-file kms_server_cert.pem \
+ -private-key-file kms_server_key.pem
+```
+Example invocation for an AWS environment:
+```bash
+./credhub-kms-plugin \
+ -aws-region=<eu-west-1> \
+ -aws-secret-id=<secret name> \
  -socket /var/vcap/sys/run/credhub-kms-plugin/kms-plugin.sock \
  -public-key-file kms_server_cert.pem \
  -private-key-file kms_server_key.pem
@@ -42,11 +51,11 @@ Example invocation for an Azure environment:
 # Switching between credhub providers
 The interface between credhub and the kms-plugin does not pass the nonce that is used by the internal provider. This means that the plugin cannot decrypt values that were encrypted by the internal provider.  
 Steps you can take to switch providers:
-* deploy kms plugin (use [a BOSH release for that](https://github.com/vmware-archive/sample-credhub-kms-plugin-release/tree/main))
+* deploy kms plugin using this BOSH release
+* make sure nobody else uses credhub (yes, we assume this has impact on availability)
 * create a credhub backup, just to be sure (you can make a mysqldump of the cf credhub database)
 * run a credhub export, saving the output to a file that you can later use to import again (you do lose entry versions though)
-* stop all but one credhub instance (we assume you can afford this decreased availability)
-* make sure nobody else uses credhub (yes, we again assume this has impact on availability)
+* stop all but one credhub instance
 * delete all credhub entries: 
 ```bash
 #! /bin/bash
@@ -56,7 +65,7 @@ do
   credhub d -n $E
 done
 ```
-* also on the cf database server:  ``delete from encryption_key_canary`` (it looks this is used during startup of credhub, and it will fail when you first run with your kms-plugin)
+* also on the cf database server:  ``delete from encryption_key_canary`` (it looks this is used during startup of credhub, and it will fail when you first run with your credhub-kms-plugin)
 * start credhub
 * check credhub.log
 * credhub import all the entries, using the yml file you created earlier

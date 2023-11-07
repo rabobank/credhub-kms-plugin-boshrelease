@@ -9,20 +9,17 @@ import (
 )
 
 func GetSecret(keyVaultName, secretName string) (string, error) {
-	cred, err := azidentity.NewDefaultAzureCredential(nil)
-	if err != nil {
+	if cred, err := azidentity.NewDefaultAzureCredential(nil); err != nil {
 		return "", errors.New(fmt.Sprintf("failed to obtain a default Azure credential: %v", err))
+	} else {
+		if client, err := azsecrets.NewClient(fmt.Sprintf("https://%s.vault.azure.net/", keyVaultName), cred, nil); err != nil {
+			return "", errors.New(fmt.Sprintf("failed to create an azsecrets client: %v", err))
+		} else {
+			if resp, err := client.GetSecret(context.Background(), secretName, "", nil); err != nil {
+				return "", errors.New(fmt.Sprintf("failed to get secret %s: %v", secretName, err))
+			} else {
+				return *resp.Value, nil
+			}
+		}
 	}
-
-	client, err := azsecrets.NewClient(fmt.Sprintf("https://%s.vault.azure.net/", keyVaultName), cred, nil)
-	if err != nil {
-		return "", errors.New(fmt.Sprintf("failed to create an azsecrets client: %v", err))
-	}
-
-	resp, err := client.GetSecret(context.Background(), secretName, "", nil)
-	if err != nil {
-		return "", errors.New(fmt.Sprintf("failed to get secret %s: %v", secretName, err))
-	}
-
-	return *resp.Value, nil
 }
