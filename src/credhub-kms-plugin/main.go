@@ -40,7 +40,7 @@ func main() {
 	log.SetOutput(os.Stdout)
 
 	if (azKeyvaultName == "" && awsSecretId == "") || (azKeyvaultName != "" && awsSecretId != "") {
-		log.Fatal("az-keyvault-name OR aws-secret-arn must be specified")
+		log.Fatal("az-keyvault-name OR aws-secret-id must be specified")
 	}
 
 	var initFailed = false
@@ -70,7 +70,7 @@ func main() {
 	if awsSecretId != "" {
 		var err error
 		if awsRegion == "" {
-			log.Error("aws-region must be specified when using aws-secret-arn")
+			log.Error("aws-region must be specified when using aws-secret-id")
 			initFailed = true
 		}
 		if credhubEncryptionKey, err = pluginaws.GetSecret(awsRegion, awsSecretId); err != nil {
