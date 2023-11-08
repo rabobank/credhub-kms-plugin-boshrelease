@@ -79,6 +79,7 @@ Example invocation for an AWS environment:
 # Switching between credhub providers
 The interface between credhub and the kms-plugin does not pass the nonce that is used by the internal provider. This means that the plugin cannot decrypt values that were encrypted by the internal provider.  
 Steps you can take to switch providers:
+* store an encryption key (in either Azure keyvault or AWS Secrets Manager), and make sure it is 32 characters long
 * deploy kms plugin using this BOSH release
 * make sure nobody else uses credhub (yes, we assume this has impact on availability)
 * create a credhub backup, just to be sure (you can make a mysqldump of the cf credhub database)
