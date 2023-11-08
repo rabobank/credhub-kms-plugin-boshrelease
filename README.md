@@ -1,6 +1,6 @@
 # credhub-kms-plugin
 
-Encrypts/decrypts credentials using an encryption key stored in Azure keyvault or AWS Secrets Manager.
+Encrypts/decrypts credentials using an encryption key stored in Azure keyvault or AWS Secrets Manager. See the [Cloud Foundry documentation on kms-plugin](https://docs.cloudfoundry.org/credhub/kms-plugin.html).
 
 # Generate the protobuf code
 ```bash
