@@ -133,9 +133,38 @@ To deploy the plugin, you can use the following bosh operator file:
     properties:
       credhub-kms-plugin:
         socket_endpoint: /var/vcap/sys/run/credhub-kms-plugin/credhub-kms-plugin.sock
+# values for Azure:
         az-tenant-id: ((azure_tenant_id))
         az-keyvault-name: my-credhub-keyvault
         az-keyvault-secret-name: credhub-encryption-key
+# values for AWS:
+        aws-region: ((aws_region))
+        aws_secret_id: my-credhub-secret
         private_key: ((credhub-kms-plugin.private_key))
         certificate: ((credhub-kms-plugin.certificate))
 ```
+
+# Creating the AWS secret in Secrets Manager
+When creating the secret in AWS SM, make sure not to use a (JSON) key value pair, but just a plain string.  
+Also don't activate automatic rotation.
+
+# Creating the AWS IAM policy and assign EC2 Instance Profile to the credhub VMs
+The credhub VMs need an EC2 instance profile that allows for reading the secret from AWS Secrets Manager.  
+This could be an example of the (inline) policy:
+````
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowReadingSecret",
+            "Effect": "Allow",
+            "Action": [
+                "secretsmanager:GetSecretValue"
+            ],
+            "Resource": [
+                "arn:aws:secretsmanager:eu-west-1:123456789012:secret:my-credhub-secret-123456"
+            ]
+        }
+    ]
+}
+````

@@ -90,31 +90,30 @@ func (g *Plugin) Version(ctx context.Context, request *pb.VersionRequest) (*pb.V
 func (g *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.EncryptResponse, error) {
 	_ = ctx // get rid of compile warnings
 	log.Infof("encrypting, plaintext length: %d", len(request.Plain))
-	response, err := encryptBytes(request.Plain, g.credhubEncryptionKey)
-	if err != nil {
+	if response, err := encryptBytes(request.Plain, g.credhubEncryptionKey); err != nil {
 		log.Errorf("failed to encrypt, plaint text length %d, error: %v", len(request.Plain), err)
 		return nil, err
+	} else {
+		return &pb.EncryptResponse{Cipher: []byte(response)}, nil
 	}
-	return &pb.EncryptResponse{Cipher: []byte(response)}, nil
 }
 
 func (g *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.DecryptResponse, error) {
 	_ = ctx // get rid of compile warnings
 	log.Infof("decrypting, cipher length: %d", len(request.Cipher))
-	plainText, err := decryptBytes(request.Cipher, g.credhubEncryptionKey)
-	if err != nil {
+	if plainText, err := decryptBytes(request.Cipher, g.credhubEncryptionKey); err != nil {
 		log.Errorf("failed to decrypt, plaint text length %d, error: %v", len(request.Cipher), err)
 		return nil, err
+	} else {
+		return &pb.DecryptResponse{Plain: []byte(plainText)}, nil
 	}
-	return &pb.DecryptResponse{Plain: []byte(plainText)}, nil
 }
 
 func (g *Plugin) cleanSockFile() error {
 	if strings.HasPrefix(g.pathToUnixSocket, "@") {
 		return nil
 	}
-	err := unix.Unlink(g.pathToUnixSocket)
-	if err != nil && !os.IsNotExist(err) {
+	if err := unix.Unlink(g.pathToUnixSocket); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to delete the socket file, error: %v", err)
 	}
 	return nil
@@ -128,28 +127,26 @@ func encryptBytes(bytesToEncrypt []byte, encryptKey string) (string, error) {
 	key, _ := hex.DecodeString(hex.EncodeToString([]byte(encryptKey)))
 
 	//Create a new Cipher Block from the key
-	block, err := aes.NewCipher(key)
-	if err != nil {
+	if block, err := aes.NewCipher(key); err != nil {
 		return encryptedString, err
+	} else {
+		//Create a new GCM - https://en.wikipedia.org/wiki/Galois/Counter_Mode  https://golang.org/pkg/crypto/cipher/#NewGCM
+		if aesGCM, err := cipher.NewGCM(block); err != nil {
+			return encryptedString, err
+		} else {
+			//Create a nonce. Nonce should be from GCM
+			nonce := make([]byte, aesGCM.NonceSize())
+			if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+				return encryptedString, err
+			} else {
+				//Encrypt the data using aesGCM.Seal
+				//Since we don't want to save the nonce somewhere else in this case, we add it as a prefix to the encrypted data. The first nonce argument in Seal is the prefix.
+				ciphertext := aesGCM.Seal(nonce, nonce, bytesToEncrypt, nil)
+				encryptedString = fmt.Sprintf("%x", ciphertext)
+				return encryptedString, nil
+			}
+		}
 	}
-
-	//Create a new GCM - https://en.wikipedia.org/wiki/Galois/Counter_Mode  https://golang.org/pkg/crypto/cipher/#NewGCM
-	aesGCM, err := cipher.NewGCM(block)
-	if err != nil {
-		return encryptedString, err
-	}
-
-	//Create a nonce. Nonce should be from GCM
-	nonce := make([]byte, aesGCM.NonceSize())
-	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
-		return encryptedString, err
-	}
-
-	//Encrypt the data using aesGCM.Seal
-	//Since we don't want to save the nonce somewhere else in this case, we add it as a prefix to the encrypted data. The first nonce argument in Seal is the prefix.
-	ciphertext := aesGCM.Seal(nonce, nonce, bytesToEncrypt, nil)
-	encryptedString = fmt.Sprintf("%x", ciphertext)
-	return encryptedString, nil
 }
 
 func decryptBytes(encryptedBytes []byte, encryptKey string) (string, error) {
@@ -161,32 +158,27 @@ func decryptBytes(encryptedBytes []byte, encryptKey string) (string, error) {
 	enc, _ := hex.DecodeString(string(encryptedBytes))
 
 	//Create a new Cipher Block from the key
-	block, err := aes.NewCipher(key)
-	if err != nil {
+	if block, err := aes.NewCipher(key); err != nil {
 		return decryptedString, err
+	} else {
+		//Create a new GCM
+		if aesGCM, err := cipher.NewGCM(block); err != nil {
+			return decryptedString, err
+		} else {
+			//Get the nonce size
+			nonceSize := aesGCM.NonceSize()
+			//Extract the nonce from the encrypted data
+			if nonceSize > len(enc) {
+				return "", errors.New(fmt.Sprintf("invalid encrypted string, size (%d) is smaller than the nonce size (%d)", nonceSize, len(enc)))
+			}
+			nonce, ciphertext := enc[:nonceSize], enc[nonceSize:]
+			//Decrypt the data
+			if plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil); err != nil {
+				return decryptedString, err
+			} else {
+				decryptedString = fmt.Sprintf("%s", plaintext)
+				return decryptedString, nil
+			}
+		}
 	}
-
-	//Create a new GCM
-	aesGCM, err := cipher.NewGCM(block)
-	if err != nil {
-		return decryptedString, err
-	}
-
-	//Get the nonce size
-	nonceSize := aesGCM.NonceSize()
-
-	//Extract the nonce from the encrypted data
-	if nonceSize > len(enc) {
-		return "", errors.New(fmt.Sprintf("invalid encrypted string, size (%d) is smaller than the nonce size (%d)", nonceSize, len(enc)))
-	}
-	nonce, ciphertext := enc[:nonceSize], enc[nonceSize:]
-
-	//Decrypt the data
-	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
-	if err != nil {
-		return decryptedString, err
-	}
-
-	decryptedString = fmt.Sprintf("%s", plaintext)
-	return decryptedString, nil
 }
