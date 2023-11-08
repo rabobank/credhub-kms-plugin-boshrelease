@@ -33,6 +33,12 @@ properties:
   credhub-kms-plugin.az-keyvault-secret-name:
     description: Azure keyvault secret name where the credhub encryption key is located
 
+  credhub-kms-plugin.aws-region:
+    description: AWS Region (like eu-west-1) where the credhub encryption key is located
+
+  credhub-kms-plugin.aws-secret-id:
+    description: Name or full ARN of the AWS Secrets Manager secret.
+
   # BPM
   bpm.enabled:
     description: "Enable Bosh Process Manager"
