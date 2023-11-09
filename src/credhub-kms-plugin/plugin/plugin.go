@@ -94,18 +94,18 @@ func (g *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.E
 		log.Errorf("failed to encrypt, plaint text length %d, error: %v", len(request.Plain), err)
 		return nil, err
 	} else {
-		return &pb.EncryptResponse{Cipher: []byte(response)}, nil
+		return &pb.EncryptResponse{Cipher: response}, nil
 	}
 }
 
 func (g *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.DecryptResponse, error) {
 	_ = ctx // get rid of compile warnings
 	log.Infof("decrypting, cipher length: %d", len(request.Cipher))
-	if plainText, err := decryptBytes(request.Cipher, g.credhubEncryptionKey); err != nil {
+	if decryptedBytes, err := decryptBytes(request.Cipher, g.credhubEncryptionKey); err != nil {
 		log.Errorf("failed to decrypt, plaint text length %d, error: %v", len(request.Cipher), err)
 		return nil, err
 	} else {
-		return &pb.DecryptResponse{Plain: []byte(plainText)}, nil
+		return &pb.DecryptResponse{Plain: decryptedBytes}, nil
 	}
 }
 
@@ -119,66 +119,59 @@ func (g *Plugin) cleanSockFile() error {
 	return nil
 }
 
-func encryptBytes(bytesToEncrypt []byte, encryptKey string) (string, error) {
-	var encryptedString string
+func encryptBytes(bytesToEncrypt []byte, encryptKey string) ([]byte, error) {
+	var encryptedBytes []byte
 	if len(bytesToEncrypt) == 0 {
-		return "", nil
+		return encryptedBytes, nil
 	}
 	key, _ := hex.DecodeString(hex.EncodeToString([]byte(encryptKey)))
 
 	//Create a new Cipher Block from the key
 	if block, err := aes.NewCipher(key); err != nil {
-		return encryptedString, err
+		return encryptedBytes, err
 	} else {
 		//Create a new GCM - https://en.wikipedia.org/wiki/Galois/Counter_Mode  https://golang.org/pkg/crypto/cipher/#NewGCM
 		if aesGCM, err := cipher.NewGCM(block); err != nil {
-			return encryptedString, err
+			return encryptedBytes, err
 		} else {
 			//Create a nonce. Nonce should be from GCM
 			nonce := make([]byte, aesGCM.NonceSize())
 			if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
-				return encryptedString, err
+				return encryptedBytes, err
 			} else {
 				//Encrypt the data using aesGCM.Seal
 				//Since we don't want to save the nonce somewhere else in this case, we add it as a prefix to the encrypted data. The first nonce argument in Seal is the prefix.
 				ciphertext := aesGCM.Seal(nonce, nonce, bytesToEncrypt, nil)
-				encryptedString = fmt.Sprintf("%x", ciphertext)
-				return encryptedString, nil
+				return ciphertext, nil
 			}
 		}
 	}
 }
 
-func decryptBytes(encryptedBytes []byte, encryptKey string) (string, error) {
-	var decryptedString string
+func decryptBytes(encryptedBytes []byte, encryptKey string) ([]byte, error) {
+	var decryptedBytes []byte
 	if len(encryptedBytes) == 0 {
-		return "", nil
+		return decryptedBytes, nil
 	}
 	key, _ := hex.DecodeString(hex.EncodeToString([]byte(encryptKey)))
-	enc, _ := hex.DecodeString(string(encryptedBytes))
 
 	//Create a new Cipher Block from the key
 	if block, err := aes.NewCipher(key); err != nil {
-		return decryptedString, err
+		return decryptedBytes, err
 	} else {
 		//Create a new GCM
 		if aesGCM, err := cipher.NewGCM(block); err != nil {
-			return decryptedString, err
+			return decryptedBytes, err
 		} else {
 			//Get the nonce size
 			nonceSize := aesGCM.NonceSize()
 			//Extract the nonce from the encrypted data
-			if nonceSize > len(enc) {
-				return "", errors.New(fmt.Sprintf("invalid encrypted string, size (%d) is smaller than the nonce size (%d)", nonceSize, len(enc)))
+			if nonceSize > len(encryptedBytes) {
+				return decryptedBytes, errors.New(fmt.Sprintf("invalid encrypted string, size (%d) is smaller than the nonce size (%d)", nonceSize, len(encryptedBytes)))
 			}
-			nonce, ciphertext := enc[:nonceSize], enc[nonceSize:]
+			nonce, ciphertext := encryptedBytes[:nonceSize], encryptedBytes[nonceSize:]
 			//Decrypt the data
-			if plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil); err != nil {
-				return decryptedString, err
-			} else {
-				decryptedString = fmt.Sprintf("%s", plaintext)
-				return decryptedString, nil
-			}
+			return aesGCM.Open(nil, nonce, ciphertext, nil)
 		}
 	}
 }

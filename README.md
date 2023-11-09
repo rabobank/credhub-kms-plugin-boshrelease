@@ -80,7 +80,6 @@ Example invocation for an AWS environment:
 The interface between credhub and the kms-plugin does not pass the nonce that is used by the internal provider. This means that the plugin cannot decrypt values that were encrypted by the internal provider.  
 Steps you can take to switch providers:
 * store an encryption key (in either Azure keyvault or AWS Secrets Manager), and make sure it is 32 characters long
-* deploy kms plugin using this BOSH release
 * make sure nobody else uses credhub (yes, we assume this has impact on availability)
 * create a credhub backup, just to be sure (you can make a mysqldump of the cf credhub database)
 * run a credhub export, saving the output to a file that you can later use to import again (you do lose older entry **versions** though)
@@ -94,13 +93,12 @@ do
   credhub d -n $E
 done
 ```
-* also on the cf database server:  ``delete from encryption_key_canary`` (it looks like this is used during the startup of credhub, and it will fail when you first run with your credhub-kms-plugin while the table still contains that one row)
-* start credhub
-* check credhub.log
+* also on the cf database server:  ``delete from credential_version;delete from encrypted_value;delete from encryption_key_canary;`` (it looks like the encryption_key_canary is used during the startup of credhub, and it will fail when you first run with your credhub-kms-plugin while the table still contains that one row)
+* deploy kms plugin using this BOSH release
+* check credhub.log's for errors
 * credhub import all the entries, using the yml file you created earlier
-* test: ``cf cs credhub default credhub-plugin-test -c '{"testcredentialP":"testsecretP"}'``
-* start the other credhub instances
-
+* test: ``cf cs credhub default credhub-plugin-test -c '{"testcredentialP":"testsecretP"}' && cf ds -f credhub-plugin-test``
+* make credhub available for everyone again
 
 ## Building the BOSH release 
 
