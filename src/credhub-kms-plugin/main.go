@@ -57,13 +57,13 @@ func main() {
 			os.Exit(1)
 		}
 		var err error
+		if err := os.Setenv("AZURE_TENANT_ID", azTenantId); err != nil {
+			log.Fatalf("failed to set AZURE_TENANT_ID environment variable: %v", err)
+		}
 		if credhubEncryptionKey, err = pluginazure.GetSecret(azKeyvaultName, azKeyvaultSecretName); err != nil {
 			log.Fatalf("failed to get credhub encryption key from Azure keyvault %s: %v", azKeyvaultName, err)
 		} else {
 			log.Infof("got credhub encryption key from Azure keyvault %s", azKeyvaultName)
-		}
-		if err := os.Setenv("AZURE_TENANT_ID", azTenantId); err != nil {
-			log.Fatalf("failed to set AZURE_TENANT_ID environment variable: %v", err)
 		}
 	}
 
