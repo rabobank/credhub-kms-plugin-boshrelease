@@ -18,6 +18,7 @@ var (
 	pathToPublicKeyFile  string
 	pathToPrivateKeyFile string
 	azTenantId           string
+	azClientId           string
 	azKeyvaultName       string
 	azKeyvaultSecretName string
 	awsRegion            string
@@ -30,6 +31,7 @@ func main() {
 	flag.StringVar(&pathToPrivateKeyFile, "private-key-file", "private-key.pem", "Path to the private keyfile")
 	flag.StringVar(&pathToPublicKeyFile, "public-key-file", "public-key.pem", "Path to the public keyfile")
 	flag.StringVar(&azTenantId, "az-tenant-id", "", "Azure Tenant ID where the keyvault is located")
+	flag.StringVar(&azClientId, "az-client-id", "", "Azure Client ID, can be the ID of a Managed Identity or the ID of a Service Principal")
 	flag.StringVar(&azKeyvaultName, "az-keyvault-name", "", "Name of the Azure keyvault that contains the credhub encryption key")
 	flag.StringVar(&azKeyvaultSecretName, "az-keyvault-secret-name", "", "Name of the secret in the Azure keyvault that contains the credhub encryption key")
 	flag.StringVar(&awsSecretId, "aws-secret-id", "", "Name or full ARN of the secret in AWS Secrets Manager that contains the credhub encryption key")
@@ -60,6 +62,11 @@ func main() {
 		if err := os.Setenv("AZURE_TENANT_ID", azTenantId); err != nil {
 			log.Fatalf("failed to set AZURE_TENANT_ID environment variable: %v", err)
 		}
+		if azClientId != "" {
+			if err := os.Setenv("AZURE_CLIENT_ID", azClientId); err != nil {
+				log.Fatalf("failed to set AZURE_CLIENT_ID environment variable: %v", err)
+			}
+		}
 		if credhubEncryptionKey, err = pluginazure.GetSecret(azKeyvaultName, azKeyvaultSecretName); err != nil {
 			log.Fatalf("failed to get credhub encryption key from Azure keyvault %s: %v", azKeyvaultName, err)
 		} else {
@@ -70,8 +77,7 @@ func main() {
 	if awsSecretId != "" {
 		var err error
 		if awsRegion == "" {
-			log.Error("aws-region must be specified when using aws-secret-id")
-			initFailed = true
+			log.Fatal("aws-region must be specified when using aws-secret-id")
 		}
 		if credhubEncryptionKey, err = pluginaws.GetSecret(awsRegion, awsSecretId); err != nil {
 			log.Fatalf("failed to get credhub encryption key from AWS Secrets Manager %s: %v", awsSecretId, err)
