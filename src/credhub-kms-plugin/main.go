@@ -59,11 +59,11 @@ func main() {
 			os.Exit(1)
 		}
 		var err error
-		if err := os.Setenv("AZURE_TENANT_ID", azTenantId); err != nil {
+		if err = os.Setenv("AZURE_TENANT_ID", azTenantId); err != nil {
 			log.Fatalf("failed to set AZURE_TENANT_ID environment variable: %v", err)
 		}
 		if azClientId != "" {
-			if err := os.Setenv("AZURE_CLIENT_ID", azClientId); err != nil {
+			if err = os.Setenv("AZURE_CLIENT_ID", azClientId); err != nil {
 				log.Fatalf("failed to set AZURE_CLIENT_ID environment variable: %v", err)
 			}
 		}
@@ -86,16 +86,15 @@ func main() {
 		}
 	}
 
-	p, err := plugin.New(pathToUnixSocket, pathToPublicKeyFile, pathToPrivateKeyFile, credhubEncryptionKey)
-	if err != nil {
+	if p, err := plugin.New(pathToUnixSocket, pathToPublicKeyFile, pathToPrivateKeyFile, credhubEncryptionKey); err != nil {
 		log.Fatal(err)
+	} else {
+		p.Start()
+
+		signals := make(chan os.Signal, 1)
+		signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+		<-signals
+
+		p.Stop()
 	}
-
-	p.Start()
-
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-	<-signals
-
-	p.Stop()
 }
