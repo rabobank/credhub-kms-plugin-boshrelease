@@ -94,6 +94,7 @@ do
   credhub d -n $E
 done
 ```
+* stop the last credhub server
 * also on the cf database server:  ``delete from credential_version;delete from encrypted_value;delete from encryption_key_canary;`` (it looks like the encryption_key_canary is used during the startup of credhub, and it will fail when you first run with your credhub-kms-plugin while the table still contains that one row)
 * deploy kms plugin using this BOSH release
 * check credhub.log's for errors
