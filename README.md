@@ -2,6 +2,9 @@
 
 The security issue with the default provider of credhub is that the encryption key is stored plaintext on the credhub VMs (`/var/vcap/jobs/credhub/config/application/encryption.yml`).  
 With this kms-plugin, the encryption key is retrieved from either Azure keyvault or AWS Secrets Manager.  
+Communication between credhub and the kms-plugin is done using gRPC with TLS over a local unix socket, this cert and the credhub cert should share the same CA (see operator file below ``((credhub-kms-plugin.ca))`` ).  
+The secrets are encrypted using AES-GCM, with a 32 byte key and each encrypred secret has it's own nonce.  The nonce and the name of the encryption key are prepended to the encrypted secret, returned to credhub, which then stores it in the credhub database.
+
 See the [Cloud Foundry documentation on kms-plugin](https://docs.cloudfoundry.org/credhub/kms-plugin.html).
 
 # Generate the protobuf code
@@ -33,7 +36,7 @@ If deployed on Azure, and you are using a Managed Identity (assigned to the VM):
 * if your VM has multiple Managed Identities assigned, you have to specify the environment variable `AZURE_CLIENT_ID` or `AZURE_CLIENT_ID_FILE` to the client id of the Managed Identity you want to use.
 
 ## AWS
-When creating the secret in AWS Secrets Manager, make sure **not** to use a (JSON) key value pair, but just a plain string.  
+When creating the secret in AWS Secrets Manager, make sure to use a (JSON) key value pair with the following (sample structure):  
 Also don't activate automatic rotation.
 
 The credhub VMs need an EC2 instance profile that allows for reading the secret from AWS Secrets Manager.  

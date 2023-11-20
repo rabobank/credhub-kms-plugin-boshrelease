@@ -4,7 +4,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"google.golang.org/grpc/credentials"
@@ -47,50 +46,50 @@ func New(pathToUnixSocketFile string, publicKeyFile string, privateKeyFile strin
 	return plgin, nil
 }
 
-func (g *Plugin) Start() {
-	if err := g.cleanSockFile(); err != nil {
-		log.Fatalf("failed to cleanSockFile %s, error: %v", g.pathToUnixSocket, err)
+func (plgin *Plugin) Start() {
+	if err := plgin.cleanSockFile(); err != nil {
+		log.Fatalf("failed to cleanSockFile %s, error: %v", plgin.pathToUnixSocket, err)
 	}
 
-	listener, err := net.Listen(netProtocol, g.pathToUnixSocket)
+	listener, err := net.Listen(netProtocol, plgin.pathToUnixSocket)
 	if err != nil {
-		log.Fatalf("failed to start listener on %s: %v", g.pathToUnixSocket, err)
+		log.Fatalf("failed to start listener on %s: %v", plgin.pathToUnixSocket, err)
 	}
-	g.Listener = listener
-	log.Warningf("listening on unix domain socket: %s, using publicKeyFile %s and privateKeyfile %s", g.pathToUnixSocket, g.pathToPublicKeyFile, g.pathToPrivateKeyFile)
+	plgin.Listener = listener
+	log.Warningf("listening on unix domain socket: %s, using publicKeyFile %s and privateKeyfile %s", plgin.pathToUnixSocket, plgin.pathToPublicKeyFile, plgin.pathToPrivateKeyFile)
 
-	creds, err := credentials.NewServerTLSFromFile(g.pathToPublicKeyFile, g.pathToPrivateKeyFile)
+	creds, err := credentials.NewServerTLSFromFile(plgin.pathToPublicKeyFile, plgin.pathToPrivateKeyFile)
 	if err != nil {
-		log.Fatalf("failed to NewServerTLSFromFile, pubKeyFile: %s, privKeyFile: %s, error: %v", g.pathToPublicKeyFile, g.pathToPrivateKeyFile, err)
+		log.Fatalf("failed to NewServerTLSFromFile, pubKeyFile: %s, privKeyFile: %s, error: %v", plgin.pathToPublicKeyFile, plgin.pathToPrivateKeyFile, err)
 	}
-	g.Server = grpc.NewServer(grpc.Creds(creds))
-	pb.RegisterKeyManagementServiceServer(g.Server, g)
-	if err = g.Serve(g.Listener); err != nil {
+	plgin.Server = grpc.NewServer(grpc.Creds(creds))
+	pb.RegisterKeyManagementServiceServer(plgin.Server, plgin)
+	if err = plgin.Serve(plgin.Listener); err != nil {
 		log.Fatalf("failed to serve gRPC, %v", err)
 	}
-	log.Warnf("serving gRPC on %s", g.pathToUnixSocket)
+	log.Warnf("serving gRPC on %s", plgin.pathToUnixSocket)
 }
 
-func (g *Plugin) Stop() {
-	if g.Server != nil {
-		g.Server.Stop()
+func (plgin *Plugin) Stop() {
+	if plgin.Server != nil {
+		plgin.Server.Stop()
 	}
 
-	if g.Listener != nil {
-		_ = g.Listener.Close()
+	if plgin.Listener != nil {
+		_ = plgin.Listener.Close()
 	}
 	log.Infof("stopped gRPC server")
 }
 
-func (g *Plugin) Version(ctx context.Context, request *pb.VersionRequest) (*pb.VersionResponse, error) {
+func (plgin *Plugin) Version(ctx context.Context, request *pb.VersionRequest) (*pb.VersionResponse, error) {
 	log.Infof("version rpc was called with version %s and context: %v", request.Version, ctx)
 	return &pb.VersionResponse{Version: apiVersion, RuntimeName: runtime, RuntimeVersion: runtimeVersion}, nil
 }
 
-func (g *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.EncryptResponse, error) {
+func (plgin *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.EncryptResponse, error) {
 	_ = ctx // get rid of compile warnings
 	log.Infof("encrypting, plaintext length: %d", len(request.Plain))
-	if response, err := encryptBytes(request.Plain, g.credhubEncryptionKey); err != nil {
+	if response, err := encryptBytes(request.Plain, plgin.credhubEncryptionKey); err != nil {
 		log.Errorf("failed to encrypt, plaint text length %d, error: %v", len(request.Plain), err)
 		return nil, err
 	} else {
@@ -98,10 +97,10 @@ func (g *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.E
 	}
 }
 
-func (g *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.DecryptResponse, error) {
+func (plgin *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.DecryptResponse, error) {
 	_ = ctx // get rid of compile warnings
 	log.Infof("decrypting, cipher length: %d", len(request.Cipher))
-	if decryptedBytes, err := decryptBytes(request.Cipher, g.credhubEncryptionKey); err != nil {
+	if decryptedBytes, err := decryptBytes(request.Cipher, plgin.credhubEncryptionKey); err != nil {
 		log.Errorf("failed to decrypt, plaint text length %d, error: %v", len(request.Cipher), err)
 		return nil, err
 	} else {
@@ -109,11 +108,11 @@ func (g *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.D
 	}
 }
 
-func (g *Plugin) cleanSockFile() error {
-	if strings.HasPrefix(g.pathToUnixSocket, "@") {
+func (plgin *Plugin) cleanSockFile() error {
+	if strings.HasPrefix(plgin.pathToUnixSocket, "@") {
 		return nil
 	}
-	if err := unix.Unlink(g.pathToUnixSocket); err != nil && !os.IsNotExist(err) {
+	if err := unix.Unlink(plgin.pathToUnixSocket); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to delete the socket file, error: %v", err)
 	}
 	return nil
@@ -124,10 +123,9 @@ func encryptBytes(bytesToEncrypt []byte, encryptKey string) ([]byte, error) {
 	if len(bytesToEncrypt) == 0 {
 		return encryptedBytes, nil
 	}
-	key, _ := hex.DecodeString(hex.EncodeToString([]byte(encryptKey)))
 
 	//Create a new Cipher Block from the key
-	if block, err := aes.NewCipher(key); err != nil {
+	if block, err := aes.NewCipher([]byte(encryptKey)); err != nil {
 		return encryptedBytes, err
 	} else {
 		//Create a new GCM - https://en.wikipedia.org/wiki/Galois/Counter_Mode  https://golang.org/pkg/crypto/cipher/#NewGCM
@@ -153,10 +151,9 @@ func decryptBytes(encryptedBytes []byte, encryptKey string) ([]byte, error) {
 	if len(encryptedBytes) == 0 {
 		return decryptedBytes, nil
 	}
-	key, _ := hex.DecodeString(hex.EncodeToString([]byte(encryptKey)))
 
 	//Create a new Cipher Block from the key
-	if block, err := aes.NewCipher(key); err != nil {
+	if block, err := aes.NewCipher([]byte(encryptKey)); err != nil {
 		return decryptedBytes, err
 	} else {
 		//Create a new GCM
