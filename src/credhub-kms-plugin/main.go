@@ -71,11 +71,27 @@ func main() {
 			log.Fatalf("failed to load the encryption key set from provider: %v", err)
 		}
 
-		plgin.Start()
+		go func() {
+			plgin.Start()
+		}()
+
+		go func() {
+			for {
+				time.Sleep(30 * time.Minute)
+				if err = plugin.LoadFromProvider(); err != nil {
+					log.Errorf("failed to reload the encryption key set from provider: %v", err)
+					// TODO here we should somehow indicate that our health is not OK
+				} else {
+					// TODO here we should somehow indicate that our health is OK
+				}
+			}
+		}()
 
 		signals := make(chan os.Signal, 1)
 		signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+		log.Error("waiting for OS signals...")
 		<-signals
+		log.Error("signal received, stopping plugin...")
 
 		plgin.Stop()
 	}

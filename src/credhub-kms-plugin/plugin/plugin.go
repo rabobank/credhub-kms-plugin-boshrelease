@@ -17,6 +17,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/net/context"
@@ -33,19 +34,22 @@ const (
 	DateFormat     = "2006-01-02 15:04"
 )
 
-var CurrentKeySet *EncryptionKeySet
+var (
+	CurrentKeySet   *EncryptionKeySet
+	keyProviderLock sync.Mutex
+)
 
-type PluginTime time.Time
+type KeySetTime time.Time
 
-func (c *PluginTime) Format() string {
+func (c *KeySetTime) Format() string {
 	return time.Time(*c).Format(DateFormat)
 }
 
-func (c *PluginTime) UnmarshalJSON(b []byte) error {
+func (c *KeySetTime) UnmarshalJSON(b []byte) error {
 	if t, err := time.Parse(DateFormat, strings.Trim(string(b), `"`)); err != nil {
 		return err
 	} else {
-		*c = PluginTime(t)
+		*c = KeySetTime(t)
 		return nil
 	}
 }
@@ -58,7 +62,7 @@ type Key struct {
 	Name   string     `json:"name"`
 	Value  string     `json:"value"`
 	Active bool       `json:"active"`
-	Date   PluginTime `json:"date"`
+	Date   KeySetTime `json:"date"`
 }
 
 func (ks *EncryptionKeySet) String() string {
@@ -73,7 +77,7 @@ func (ks *EncryptionKeySet) GetCurrentKeyValue() string {
 	//log.Infof("get current key value, number of keys: %d", len(ks.Keys))
 	for ix, key := range ks.Keys {
 		if key.Active {
-			log.Infof("returning key(%d) %s", ix, key.Name)
+			log.Infof("using encryption key %d: %s", ix, key.Name)
 			return key.Value
 		}
 	}
@@ -81,15 +85,22 @@ func (ks *EncryptionKeySet) GetCurrentKeyValue() string {
 }
 
 func LoadFromProvider() (err error) {
+	keyProviderLock.Lock()
+	defer keyProviderLock.Unlock()
 	var secretString *string
 	if conf.CurrentCloudProvider == conf.CurrentCloudProviderAzure {
 		secretString, err = pluginazure.GetSecrets(conf.AzKeyvaultName, conf.AzKeyvaultSecretName)
-		//log.Warningf("loaded encryption keyset from provider: %s", *secretString)
+		//log.Infof("got secretString: %s", *secretString)
 	} else if conf.CurrentCloudProvider == conf.CurrentCloudProviderAWS {
 		secretString, err = pluginaws.GetSecrets(conf.AwsRegion, conf.AwsSecretId)
 	}
-	if err = json.Unmarshal([]byte(*secretString), &CurrentKeySet); err == nil {
-		log.Infof("load encryption keyset from provider: %s", CurrentKeySet.String())
+	if err != nil {
+		return err
+	}
+	if err = json.Unmarshal([]byte(*secretString), &CurrentKeySet); err == nil && len(CurrentKeySet.Keys) > 0 {
+		log.Infof("(re)loaded encryption keyset from provider: %s", CurrentKeySet.String())
+	} else {
+		return errors.New(fmt.Sprintf("failed to unmarshal encryption keyset from provider: %v, (if err is nil, we got no keys from provider)", err))
 	}
 	return err
 }
@@ -191,7 +202,6 @@ func (plgin *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*
 		log.Errorf("failed to create new cipher block: %v", err)
 		return nil, err
 	} else {
-		//Create a new GCM
 		var aesGCM cipher.AEAD
 		if aesGCM, err = cipher.NewGCM(block); err != nil {
 			return nil, err
@@ -204,10 +214,17 @@ func (plgin *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*
 			nonce, ciphertext := request.Cipher[:nonceSize], request.Cipher[nonceSize:]
 			//Decrypt the data
 			if decryptedBytes, err = aesGCM.Open(nil, nonce, ciphertext, nil); err != nil {
-				return nil, errors.New(fmt.Sprintf("failed to decrypt: %s", err))
-			} else {
-				return &pb.DecryptResponse{Plain: decryptedBytes}, nil
+				log.Errorf("failed to decrypt: %v", err)
+				// we retry, since we might have a cipher that was the result of an encryption by another credhub instance using a new cnc key we did not have yet
+				if err = LoadFromProvider(); err != nil {
+					log.Errorf("failed to reload the encryption key set from provider: %v", err)
+				} else {
+					if decryptedBytes, err = aesGCM.Open(nil, nonce, ciphertext, nil); err != nil {
+						return nil, errors.New(fmt.Sprintf("failed to decrypt: %s", err))
+					}
+				}
 			}
+			return &pb.DecryptResponse{Plain: decryptedBytes}, nil
 		}
 	}
 }
