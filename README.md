@@ -3,7 +3,8 @@
 The security issue with the default provider of credhub is that the encryption key is stored plaintext on the credhub VMs (`/var/vcap/jobs/credhub/config/application/encryption.yml`).  
 With this kms-plugin, the encryption key is retrieved from either Azure keyvault or AWS Secrets Manager.  
 Communication between credhub and the kms-plugin is done using gRPC with TLS over a local unix socket, this cert and the credhub cert should share the same CA (see operator file below ``((credhub-kms-plugin.ca))`` ).  
-The secrets are encrypted using AES-GCM, with a 32 byte key and each encrypred secret has it's own nonce.  The nonce and the name of the encryption key are prepended to the encrypted secret, returned to credhub, which then stores it in the credhub database.
+The secrets are encrypted using AES-GCM, with a 32 byte key and each encrypted secret has it's own nonce.  
+The nonce and the name of the encryption key are prepended to the encrypted secret, returned to credhub, which then stores it in the credhub database.
 
 See the [Cloud Foundry documentation on kms-plugin](https://docs.cloudfoundry.org/credhub/kms-plugin.html).
 
@@ -30,6 +31,40 @@ go build
 ```
 
 # Deploying
+
+For both AWS and Azure you have to setup the secrets there first, in Azure you use a keyvault, in AWS you use Secrets Manager.  
+The value of the secret should be a json structure that specifies all encryption keys:  
+
+````json
+{
+  "keys": [
+    {
+      "name": "key0002",
+      "value": "bcdefghijklmnopqrstuvwxyz1234567",
+      "active": false,
+      "date": "2023-11-19 15:33"
+    },
+    {
+      "name": "key0003",
+      "value": "abcdefghijklmnopqrstuvwxyz123456",
+      "active": false,
+      "date": "2023-11-18 14:32"
+    },
+    {
+      "name": "key0001",
+      "value": "this-is-a-32-byte-encryption-key",
+      "active": true,
+      "date": "2023-11-20 16:34"
+    }
+  ]
+}
+````
+* The maximum length of a key name is 16 characters.
+* The length of the encryption key value must be 32 characters.
+* Only one key can be "active" at any point in time, that key will be used to encrypt new secrets.
+* Once an encryption key has been used to encrypt secrets, it cannot be deleted from the secret store anymore because you need it to decrypt the secrets.  
+* Do not rename an encryption key, because during decryption the name is used to identify the key in the secret store.
+
 ## Azure
 If deployed on Azure, and you are using a Managed Identity (assigned to the VM):
 * you have to set the environment variable `AZURE_TENANT_ID` or `AZURE_TENANT_ID_FILE` to the tenant id of the Azure subscription.

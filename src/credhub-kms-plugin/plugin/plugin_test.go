@@ -1,0 +1,94 @@
+package plugin
+
+import (
+	"fmt"
+	pb "github.com/rabobank/credhub-kms-plugin/v1beta1"
+	"golang.org/x/net/context"
+	"testing"
+	"time"
+)
+
+var (
+	theTime, _ = time.Parse(DateFormat, "2023-11-22 10:52")
+	key1       = Key{Name: "key0002", Value: "bcdefghijklmnopqrstuvwxyz1234567", Active: false, Date: KeySetTime(theTime)}
+	key2       = Key{Name: "key0003", Value: "abcdefghijklmnopqrstuvwxyz123456", Active: false, Date: KeySetTime(theTime)}
+	key3       = Key{Name: "key0001", Value: "this-is-a-32-byte-encryption-key", Active: true, Date: KeySetTime(theTime)}
+	encKeySet  = EncryptionKeySet{Keys: []Key{key1, key2, key3}}
+)
+
+func Test_GetString(t *testing.T) {
+	result := encKeySet.String()
+	expected := fmt.Sprintf(" {name:key0002, active=false, date=2023-11-22 10:52} {name:key0003, active=false, date=2023-11-22 10:52} {name:key0001, active=true, date=2023-11-22 10:52}")
+	if result != expected {
+		t.Errorf("string of EncryptionKeySet incorrect:\n%s  <= result \n%s   <= expected", result, expected)
+	}
+}
+
+func Test_GetCurrentKeyValue(t *testing.T) {
+	result := encKeySet.GetCurrentKeyValue()
+	expected := fmt.Sprintf("this-is-a-32-byte-encryption-key")
+	if result != expected {
+		t.Errorf("GetCurrentKeyValue of EncryptionKeySet incorrect:\n%s  <= result \n%s   <= expected", result, expected)
+	}
+}
+
+func Test_GetCurrentKeyNamePadded(t *testing.T) {
+	result := encKeySet.GetCurrentKeyNamePadded()
+	expected := fmt.Sprintf("         key0001")
+	if result != expected {
+		t.Errorf("GetCurrentKeyNamePadded of EncryptionKeySet incorrect:\n%s  <= result \n%s   <= expected", result, expected)
+	}
+}
+
+func Test_GetValueOfKey(t *testing.T) {
+	result := encKeySet.GetValueOfKey("key0002")
+	expected := fmt.Sprintf("bcdefghijklmnopqrstuvwxyz1234567")
+	if result != expected {
+		t.Errorf("GetValueOfKey of EncryptionKeySet incorrect:\n%s  <= result \n%s   <= expected", result, expected)
+	}
+}
+
+func Test_EncryptDecrypt(t *testing.T) {
+	plgin := new(Plugin)
+	CurrentKeySet = &encKeySet
+	testData := "data to be encrypted should give a cipher length of 82"
+	if encryptResponse, err := plgin.Encrypt(context.Background(), &pb.EncryptRequest{Version: "1", Plain: []byte(testData)}); err != nil {
+		t.Errorf("Encrypt failed: %s", err)
+	} else {
+		fmt.Printf("cipher length: %d\n", len(encryptResponse.Cipher))
+		expectedLength := 98
+		if len(encryptResponse.Cipher) != expectedLength {
+			t.Errorf("Encrypt failed: cipher length should be %d but is %d", expectedLength, len(encryptResponse.Cipher))
+		}
+
+		if decryptResponse, err := plgin.Decrypt(context.Background(), &pb.DecryptRequest{Version: "1", Cipher: encryptResponse.Cipher}); err != nil {
+			t.Errorf("Decrypt failed: %s", err)
+		} else {
+			fmt.Printf("plain length: %d\n", len(decryptResponse.Plain))
+			expectedLength = 54
+			if len(decryptResponse.Plain) != expectedLength {
+				t.Errorf("Decrypt failed: plain length should be %d but is %d", expectedLength, len(decryptResponse.Plain))
+			}
+			if string(decryptResponse.Plain) != testData {
+				t.Errorf("Decrypt failed: plain should be '%s' but is '%s'", testData, decryptResponse.Plain)
+			}
+		}
+
+		// we now make another key active, and try again to decrypt:
+		CurrentKeySet.Keys[2].Active = false
+		CurrentKeySet.Keys[0].Active = true
+
+		if decryptResponse, err := plgin.Decrypt(context.Background(), &pb.DecryptRequest{Version: "1", Cipher: encryptResponse.Cipher}); err != nil {
+			t.Errorf("Decrypt failed: %s", err)
+		} else {
+			fmt.Printf("plain length: %d\n", len(decryptResponse.Plain))
+			expectedLength = 54
+			if len(decryptResponse.Plain) != expectedLength {
+				t.Errorf("Decrypt failed: plain length should be %d but is %d", expectedLength, len(decryptResponse.Plain))
+			}
+			if string(decryptResponse.Plain) != testData {
+				t.Errorf("Decrypt failed: plain should be '%s' but is '%s'", testData, decryptResponse.Plain)
+			}
+		}
+	}
+}

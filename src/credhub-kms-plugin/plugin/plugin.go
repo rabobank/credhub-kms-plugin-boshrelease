@@ -73,10 +73,29 @@ func (ks *EncryptionKeySet) String() string {
 	return returnString
 }
 
+func (ks *EncryptionKeySet) GetCurrentKeyNamePadded() string {
+	for _, key := range ks.Keys {
+		if key.Active {
+			return fmt.Sprintf("%16s", key.Name)
+		}
+	}
+	return ""
+}
+
 func (ks *EncryptionKeySet) GetCurrentKeyValue() string {
 	//log.Infof("get current key value, number of keys: %d", len(ks.Keys))
 	for ix, key := range ks.Keys {
 		if key.Active {
+			log.Infof("using encryption key %d: %s", ix, key.Name)
+			return key.Value
+		}
+	}
+	return ""
+}
+
+func (ks *EncryptionKeySet) GetValueOfKey(keyName string) string {
+	for ix, key := range ks.Keys {
+		if key.Name == keyName {
 			log.Infof("using encryption key %d: %s", ix, key.Name)
 			return key.Value
 		}
@@ -99,6 +118,7 @@ func LoadFromProvider() (err error) {
 	}
 	if err = json.Unmarshal([]byte(*secretString), &CurrentKeySet); err == nil && len(CurrentKeySet.Keys) > 0 {
 		log.Infof("(re)loaded encryption keyset from provider: %s", CurrentKeySet.String())
+		// TODO do validations:  - only one active key, - no duplicate key names,  - no duplicate key values, - no empty key names, - no empty key values, - no empty key dates, values should be 32 bytes long, keys can only be 16 chars long
 	} else {
 		return errors.New(fmt.Sprintf("failed to unmarshal encryption keyset from provider: %v, (if err is nil, we got no keys from provider)", err))
 	}
@@ -182,7 +202,8 @@ func (plgin *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*
 				//Encrypt the data using aesGCM.Seal
 				//Since we don't want to save the nonce somewhere else in this case, we add it as a prefix to the encrypted data. The first nonce argument in Seal is the prefix.
 				ciphertext := aesGCM.Seal(nonce, nonce, request.Plain, nil)
-				return &pb.EncryptResponse{Cipher: ciphertext}, nil
+				keyNCiphertext := append([]byte(CurrentKeySet.GetCurrentKeyNamePadded()), ciphertext...)
+				return &pb.EncryptResponse{Cipher: keyNCiphertext}, nil
 			}
 		}
 	}
@@ -197,8 +218,13 @@ func (plgin *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*
 		return &pb.DecryptResponse{Plain: decryptedBytes}, nil
 	}
 
+	// the data consists of the keyName, the nonce and the cipher, we have to strip off the keyName first, and then the nonce and then decrypt the cipher
+
+	// get the keyName from the cipher
+	keyName := strings.TrimSpace(string(request.Cipher[:16]))
+	encKey := CurrentKeySet.GetValueOfKey(keyName)
 	//Create a new Cipher Block from the key
-	if block, err := aes.NewCipher([]byte(CurrentKeySet.GetCurrentKeyValue())); err != nil {
+	if block, err := aes.NewCipher([]byte(encKey)); err != nil {
 		log.Errorf("failed to create new cipher block: %v", err)
 		return nil, err
 	} else {
@@ -207,11 +233,12 @@ func (plgin *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*
 			return nil, err
 		} else {
 			nonceSize := aesGCM.NonceSize()
+			netCipher := request.Cipher[16:] // get the cipher without the keyName
 			//Extract the nonce from the encrypted data
-			if nonceSize > len(request.Cipher) {
-				return nil, errors.New(fmt.Sprintf("invalid encrypted string, size (%d) is smaller than the nonce size (%d)", nonceSize, len(request.Cipher)))
+			if nonceSize > len(netCipher) {
+				return nil, errors.New(fmt.Sprintf("invalid encrypted string, size (%d) is smaller than the nonce size (%d)", nonceSize, len(netCipher)))
 			}
-			nonce, ciphertext := request.Cipher[:nonceSize], request.Cipher[nonceSize:]
+			nonce, ciphertext := netCipher[:nonceSize], netCipher[nonceSize:]
 			//Decrypt the data
 			if decryptedBytes, err = aesGCM.Open(nil, nonce, ciphertext, nil); err != nil {
 				log.Errorf("failed to decrypt: %v", err)
