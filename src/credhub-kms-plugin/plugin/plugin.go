@@ -118,11 +118,56 @@ func LoadFromProvider() (err error) {
 	}
 	if err = json.Unmarshal([]byte(*secretString), &CurrentKeySet); err == nil && len(CurrentKeySet.Keys) > 0 {
 		log.Infof("(re)loaded encryption keyset from provider: %s", CurrentKeySet.String())
-		// TODO do validations:  - only one active key, - no duplicate key names,  - no duplicate key values, - no empty key names, - no empty key values, - no empty key dates, values should be 32 bytes long, keys can only be 16 chars long
+		if valErrors := validateKeySet(*CurrentKeySet); len(valErrors) > 0 {
+			for _, err := range valErrors {
+				log.Errorf("validation error: %v", err)
+			}
+			return errors.New(fmt.Sprintf("%d validation errors found while loading keyset from provider, check the plugin logs for detailed errors", len(valErrors)))
+		}
 	} else {
 		return errors.New(fmt.Sprintf("failed to unmarshal encryption keyset from provider: %v, (if err is nil, we got no keys from provider)", err))
 	}
 	return err
+}
+
+func validateKeySet(keySet EncryptionKeySet) (valErrors []error) {
+	dupKeys := make(map[string]int)
+	numActiveKeys := 0
+	for _, key := range keySet.Keys {
+		// check for duplicate key names:
+		if _, ok := dupKeys[key.Name]; ok {
+			valErrors = append(valErrors, errors.New(fmt.Sprintf("duplicate key name found: %s", key.Name)))
+		} else {
+			dupKeys[key.Name] = 1
+		}
+
+		// check for duplicate key values:
+		if _, ok := dupKeys[key.Value]; ok {
+			valErrors = append(valErrors, errors.New(fmt.Sprintf("duplicate key value found for key with name: %s", key.Name)))
+		} else {
+			dupKeys[key.Value] = 1
+		}
+
+		// check if key values are 32 bytes long
+		if len(key.Value) != 32 {
+			valErrors = append(valErrors, errors.New(fmt.Sprintf("key %s has an encryption key with length %d, it should be 32 bytes long", key.Name, len(key.Value))))
+		}
+
+		// check if key names are max 16 bytes long
+		if len(key.Name) > 16 {
+			valErrors = append(valErrors, errors.New(fmt.Sprintf("the name %s is more than 16 bytes long", key.Name)))
+		}
+
+		// check for more than one active key:
+		if key.Active {
+			numActiveKeys++
+		}
+
+	}
+	if numActiveKeys != 1 {
+		valErrors = append(valErrors, errors.New(fmt.Sprintf("number of active keys should be 1, but is %d", numActiveKeys)))
+	}
+	return
 }
 
 type Plugin struct {

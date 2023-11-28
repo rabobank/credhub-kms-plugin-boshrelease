@@ -48,6 +48,98 @@ func Test_GetValueOfKey(t *testing.T) {
 	}
 }
 
+func Test_validateKeySet(t *testing.T) {
+	//
+	// first test with a good encKeySet:
+	if valErrors := validateKeySet(encKeySet); len(valErrors) != 0 {
+		t.Errorf("validateKeySet failed, we expected 0 errors, but got %d", len(valErrors))
+	}
+
+	//
+	// test with a duplicate key name:
+	key1.Name = "key0001"
+	encKeySetA := EncryptionKeySet{Keys: []Key{key1, key2, key3}}
+	var valErrors []error
+	if valErrors = validateKeySet(encKeySetA); len(valErrors) != 1 {
+		t.Errorf("validateKeySet failed, we expected 1 error, but got %d", len(valErrors))
+	}
+	expected := "duplicate key name found: key0001"
+	if valErrors[0].Error() != expected {
+		t.Errorf("validateKeySet failed, we expected error '%s', but got '%s'", expected, valErrors[0].Error())
+	}
+	key1.Name = "key0002"
+
+	//
+	// test with a duplicate key value:
+	key2.Value = "this-is-a-32-byte-encryption-key"
+	encKeySetA = EncryptionKeySet{Keys: []Key{key1, key2, key3}}
+	valErrors = nil
+	if valErrors = validateKeySet(encKeySetA); len(valErrors) != 1 {
+		t.Errorf("validateKeySet failed, we expected 1 error, but got %d", len(valErrors))
+	}
+	expected = "duplicate key value found for key with name: key0001"
+	if valErrors[0].Error() != expected {
+		t.Errorf("validateKeySet failed, we expected error '%s', but got '%s'", expected, valErrors[0].Error())
+	}
+	key2.Value = "abcdefghijklmnopqrstuvwxyz123456"
+
+	//
+	// test with a key value that is not 32 bytes long:
+	key2.Value = "this-is-a-33-byte-encryption-keyY"
+	encKeySetA = EncryptionKeySet{Keys: []Key{key1, key2, key3}}
+	valErrors = nil
+	if valErrors = validateKeySet(encKeySetA); len(valErrors) != 1 {
+		t.Errorf("validateKeySet failed, we expected 1 error, but got %d", len(valErrors))
+	}
+	expected = "key key0003 has an encryption key with length 33, it should be 32 bytes long"
+	if valErrors[0].Error() != expected {
+		t.Errorf("validateKeySet failed, we expected error '%s', but got '%s'", expected, valErrors[0].Error())
+	}
+	key2.Value = "abcdefghijklmnopqrstuvwxyz123456"
+
+	//
+	// test with a key name that more than 16 bytes long:
+	key2.Name = "this-is-a-25-char-keyname"
+	encKeySetA = EncryptionKeySet{Keys: []Key{key1, key2, key3}}
+	valErrors = nil
+	if valErrors = validateKeySet(encKeySetA); len(valErrors) != 1 {
+		t.Errorf("validateKeySet failed, we expected 1 error, but got %d", len(valErrors))
+	}
+	expected = "the name this-is-a-25-char-keyname is more than 16 bytes long"
+	if valErrors[0].Error() != expected {
+		t.Errorf("validateKeySet failed, we expected error '%s', but got '%s'", expected, valErrors[0].Error())
+	}
+	key2.Name = "key0003"
+
+	//
+	// test with a multiple active keys:
+	key1.Active = true
+	encKeySetA = EncryptionKeySet{Keys: []Key{key1, key2, key3}}
+	valErrors = nil
+	if valErrors = validateKeySet(encKeySetA); len(valErrors) != 1 {
+		t.Errorf("validateKeySet failed, we expected 1 error, but got %d", len(valErrors))
+	}
+	expected = "number of active keys should be 1, but is 2"
+	if valErrors[0].Error() != expected {
+		t.Errorf("validateKeySet failed, we expected error '%s', but got '%s'", expected, valErrors[0].Error())
+	}
+	key1.Active = false
+
+	//
+	// test with a no active keys:
+	key3.Active = false
+	encKeySetA = EncryptionKeySet{Keys: []Key{key1, key2, key3}}
+	valErrors = nil
+	if valErrors = validateKeySet(encKeySetA); len(valErrors) != 1 {
+		t.Errorf("validateKeySet failed, we expected 1 error, but got %d", len(valErrors))
+	}
+	expected = "number of active keys should be 1, but is 0"
+	if valErrors[0].Error() != expected {
+		t.Errorf("validateKeySet failed, we expected error '%s', but got '%s'", expected, valErrors[0].Error())
+	}
+	key3.Active = true
+}
+
 func Test_EncryptDecrypt(t *testing.T) {
 	plgin := new(Plugin)
 	CurrentKeySet = &encKeySet
