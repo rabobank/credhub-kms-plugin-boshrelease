@@ -10,15 +10,15 @@ import (
 
 var (
 	theTime, _ = time.Parse(DateFormat, "2023-11-22 10:52")
-	key1       = Key{Name: "key0002", Value: "bcdefghijklmnopqrstuvwxyz1234567", Active: false, Date: KeySetTime(theTime)}
-	key2       = Key{Name: "key0003", Value: "abcdefghijklmnopqrstuvwxyz123456", Active: false, Date: KeySetTime(theTime)}
-	key3       = Key{Name: "key0001", Value: "this-is-a-32-byte-encryption-key", Active: true, Date: KeySetTime(theTime)}
+	key1       = Key{Name: "key0001", Value: "bcdefghijklmnopqrstuvwxyz1234567", Active: false, Date: KeySetTime(theTime)}
+	key2       = Key{Name: "key0002", Value: "abcdefghijklmnopqrstuvwxyz123456", Active: false, Date: KeySetTime(theTime)}
+	key3       = Key{Name: "key0003", Value: "this-is-a-32-byte-encryption-key", Active: true, Date: KeySetTime(theTime)}
 	encKeySet  = EncryptionKeySet{Keys: []Key{key1, key2, key3}}
 )
 
 func Test_GetString(t *testing.T) {
 	result := encKeySet.String()
-	expected := fmt.Sprintf(" {name:key0002, active=false, date=2023-11-22 10:52} {name:key0003, active=false, date=2023-11-22 10:52} {name:key0001, active=true, date=2023-11-22 10:52}")
+	expected := fmt.Sprintf(" {name:key0001, active=false, date=2023-11-22 10:52} {name:key0002, active=false, date=2023-11-22 10:52} {name:key0003, active=true, date=2023-11-22 10:52}")
 	if result != expected {
 		t.Errorf("string of EncryptionKeySet incorrect:\n%s  <= result \n%s   <= expected", result, expected)
 	}
@@ -34,7 +34,7 @@ func Test_GetCurrentKeyValue(t *testing.T) {
 
 func Test_GetCurrentKeyNamePadded(t *testing.T) {
 	result := encKeySet.GetCurrentKeyNamePadded()
-	expected := fmt.Sprintf("         key0001")
+	expected := fmt.Sprintf("         key0003")
 	if result != expected {
 		t.Errorf("GetCurrentKeyNamePadded of EncryptionKeySet incorrect:\n%s  <= result \n%s   <= expected", result, expected)
 	}
@@ -42,7 +42,7 @@ func Test_GetCurrentKeyNamePadded(t *testing.T) {
 
 func Test_GetValueOfKey(t *testing.T) {
 	result := encKeySet.GetValueOfKey("key0002")
-	expected := fmt.Sprintf("bcdefghijklmnopqrstuvwxyz1234567")
+	expected := fmt.Sprintf("abcdefghijklmnopqrstuvwxyz123456")
 	if result != expected {
 		t.Errorf("GetValueOfKey of EncryptionKeySet incorrect:\n%s  <= result \n%s   <= expected", result, expected)
 	}
@@ -57,17 +57,17 @@ func Test_validateKeySet(t *testing.T) {
 
 	//
 	// test with a duplicate key name:
-	key1.Name = "key0001"
+	key1.Name = "key0002"
 	encKeySetA := EncryptionKeySet{Keys: []Key{key1, key2, key3}}
 	var valErrors []error
 	if valErrors = validateKeySet(encKeySetA); len(valErrors) != 1 {
 		t.Errorf("validateKeySet failed, we expected 1 error, but got %d", len(valErrors))
 	}
-	expected := "duplicate key name found: key0001"
+	expected := "duplicate key name found: key0002"
 	if valErrors[0].Error() != expected {
 		t.Errorf("validateKeySet failed, we expected error '%s', but got '%s'", expected, valErrors[0].Error())
 	}
-	key1.Name = "key0002"
+	key1.Name = "key0001"
 
 	//
 	// test with a duplicate key value:
@@ -77,7 +77,7 @@ func Test_validateKeySet(t *testing.T) {
 	if valErrors = validateKeySet(encKeySetA); len(valErrors) != 1 {
 		t.Errorf("validateKeySet failed, we expected 1 error, but got %d", len(valErrors))
 	}
-	expected = "duplicate key value found for key with name: key0001"
+	expected = "duplicate key value found for key with name: key0003"
 	if valErrors[0].Error() != expected {
 		t.Errorf("validateKeySet failed, we expected error '%s', but got '%s'", expected, valErrors[0].Error())
 	}
@@ -91,7 +91,7 @@ func Test_validateKeySet(t *testing.T) {
 	if valErrors = validateKeySet(encKeySetA); len(valErrors) != 1 {
 		t.Errorf("validateKeySet failed, we expected 1 error, but got %d", len(valErrors))
 	}
-	expected = "key key0003 has an encryption key with length 33, it should be 32 bytes long"
+	expected = "key key0002 has an encryption key with length 33, it should be 32 bytes long"
 	if valErrors[0].Error() != expected {
 		t.Errorf("validateKeySet failed, we expected error '%s', but got '%s'", expected, valErrors[0].Error())
 	}
@@ -109,7 +109,7 @@ func Test_validateKeySet(t *testing.T) {
 	if valErrors[0].Error() != expected {
 		t.Errorf("validateKeySet failed, we expected error '%s', but got '%s'", expected, valErrors[0].Error())
 	}
-	key2.Name = "key0003"
+	key2.Name = "key0002"
 
 	//
 	// test with a multiple active keys:
