@@ -1,15 +1,15 @@
-// To regenerate service.pb.go run hack/update-generated-kms.sh
 syntax = "proto3";
-option go_package = "v1beta1/";
+option go_package = "plugin/";
 // This service defines the public APIs for remote KMS provider.
 service KeyManagementService {
   // Version returns the runtime name and runtime version of the KMS provider.
   rpc Version(VersionRequest) returns (VersionResponse) {}
-
   // Execute decryption operation in KMS provider.
   rpc Decrypt(DecryptRequest) returns (DecryptResponse) {}
   // Execute encryption operation in KMS provider.
   rpc Encrypt(EncryptRequest) returns (EncryptResponse) {}
+  // Check the health of the KMS provider.
+  rpc Health(HealthRequest) returns (HealthResponse) {}
 }
 
 message VersionRequest {
@@ -48,4 +48,12 @@ message EncryptRequest {
 message EncryptResponse {
   // The encrypted data.
   bytes cipher = 1;
+}
+
+message HealthRequest {
+  // we don't need parameters
+}
+
+message HealthResponse {
+  bool healthy = 1;
 }

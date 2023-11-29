@@ -11,8 +11,8 @@ See the [Cloud Foundry documentation on kms-plugin](https://docs.cloudfoundry.or
 # Generate the protobuf code
 The communication between credhub and a kms-plugin is done using gRPC. Therefore we need to generate the protobuf code for the gRPC service: 
 ```bash
-protoc --go_out=v1beta1 --go_opt=paths=source_relative --go-grpc_out=v1beta1 --go-grpc_opt=paths=source_relative proto/service.proto
-mv v1beta1/proto/* v1beta1/
+protoc --go_out=v1beta1 --go_opt=paths=source_relative --go-grpc_out=v1beta1 --go-grpc_opt=paths=source_relative v1beta1/service.proto
+mv v1beta1/v1beta1/* plugin/ && rm -r v1beta1/v1beta1
 ```
 
 # Compile Golang code
@@ -26,7 +26,7 @@ mkdir -p $GOPATH/src/github.com/rabobank
 git clone https://github.com/rabobank/credhub-kms-plugin $GOPATH/src/github.com/rabobank/credhub-kms-plugin
 cd $GOPATH/src/github.com/rabobank/credhub-kms-plugin
 go build
-./scripts/setup_dev_grpc_certs.sh   # generate grpc certs
+./create-grpc-certs.sh
 ./credhub-kms-plugin -socket kms-plugin.sock -public-key-file grpc-kms-certs/grpc_kms_server_cert.pem -private-key-file grpc-kms-certs/grpc_kms_server_key.pem -az-tenant-id=<tenantd-id>> -az-keyvault-name=<keyvault name> -az-keyvault-secret-name=<secret name>
 ```
 

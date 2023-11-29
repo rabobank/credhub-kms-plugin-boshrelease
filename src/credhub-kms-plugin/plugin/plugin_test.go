@@ -2,7 +2,6 @@ package plugin
 
 import (
 	"fmt"
-	pb "github.com/rabobank/credhub-kms-plugin/v1beta1"
 	"golang.org/x/net/context"
 	"testing"
 	"time"
@@ -144,7 +143,7 @@ func Test_EncryptDecrypt(t *testing.T) {
 	plgin := new(Plugin)
 	CurrentKeySet = &encKeySet
 	testData := "data to be encrypted should give a cipher length of 82"
-	if encryptResponse, err := plgin.Encrypt(context.Background(), &pb.EncryptRequest{Version: "1", Plain: []byte(testData)}); err != nil {
+	if encryptResponse, err := plgin.Encrypt(context.Background(), &EncryptRequest{Version: "1", Plain: []byte(testData)}); err != nil {
 		t.Errorf("Encrypt failed: %s", err)
 	} else {
 		fmt.Printf("cipher length: %d\n", len(encryptResponse.Cipher))
@@ -153,7 +152,7 @@ func Test_EncryptDecrypt(t *testing.T) {
 			t.Errorf("Encrypt failed: cipher length should be %d but is %d", expectedLength, len(encryptResponse.Cipher))
 		}
 
-		if decryptResponse, err := plgin.Decrypt(context.Background(), &pb.DecryptRequest{Version: "1", Cipher: encryptResponse.Cipher}); err != nil {
+		if decryptResponse, err := plgin.Decrypt(context.Background(), &DecryptRequest{Version: "1", Cipher: encryptResponse.Cipher}); err != nil {
 			t.Errorf("Decrypt failed: %s", err)
 		} else {
 			fmt.Printf("plain length: %d\n", len(decryptResponse.Plain))
@@ -170,7 +169,7 @@ func Test_EncryptDecrypt(t *testing.T) {
 		CurrentKeySet.Keys[2].Active = false
 		CurrentKeySet.Keys[0].Active = true
 
-		if decryptResponse, err := plgin.Decrypt(context.Background(), &pb.DecryptRequest{Version: "1", Cipher: encryptResponse.Cipher}); err != nil {
+		if decryptResponse, err := plgin.Decrypt(context.Background(), &DecryptRequest{Version: "1", Cipher: encryptResponse.Cipher}); err != nil {
 			t.Errorf("Decrypt failed: %s", err)
 		} else {
 			fmt.Printf("plain length: %d\n", len(decryptResponse.Plain))

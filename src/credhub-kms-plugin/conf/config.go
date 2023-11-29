@@ -1,6 +1,7 @@
 package conf
 
 var (
+	Mode                 string
 	PathToUnixSocket     string
 	PathToPublicKeyFile  string
 	PathToPrivateKeyFile string
@@ -11,6 +12,7 @@ var (
 	AwsRegion            string
 	AwsSecretId          string
 	CurrentCloudProvider = "MISSING"
+	PluginIsHealthy      = false
 )
 
 const (

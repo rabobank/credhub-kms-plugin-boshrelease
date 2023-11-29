@@ -10,7 +10,6 @@ import (
 	pluginaws "github.com/rabobank/credhub-kms-plugin/aws"
 	pluginazure "github.com/rabobank/credhub-kms-plugin/az"
 	"github.com/rabobank/credhub-kms-plugin/conf"
-	pb "github.com/rabobank/credhub-kms-plugin/v1beta1"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/credentials"
 	"io"
@@ -162,7 +161,6 @@ func validateKeySet(keySet EncryptionKeySet) (valErrors []error) {
 		if key.Active {
 			numActiveKeys++
 		}
-
 	}
 	if numActiveKeys != 1 {
 		valErrors = append(valErrors, errors.New(fmt.Sprintf("number of active keys should be 1, but is %d", numActiveKeys)))
@@ -196,18 +194,18 @@ func (plgin *Plugin) Start() {
 		log.Fatalf("failed to start listener on %s: %v", plgin.pathToUnixSocket, err)
 	}
 	plgin.Listener = listener
-	log.Warningf("listening on unix domain socket: %s, using publicKeyFile %s and privateKeyfile %s", plgin.pathToUnixSocket, plgin.pathToPublicKeyFile, plgin.pathToPrivateKeyFile)
+	log.Infof("listening on unix domain socket: %s, using publicKeyFile %s and privateKeyfile %s", plgin.pathToUnixSocket, plgin.pathToPublicKeyFile, plgin.pathToPrivateKeyFile)
 
 	creds, err := credentials.NewServerTLSFromFile(plgin.pathToPublicKeyFile, plgin.pathToPrivateKeyFile)
 	if err != nil {
 		log.Fatalf("failed to NewServerTLSFromFile, pubKeyFile: %s, privKeyFile: %s, error: %v", plgin.pathToPublicKeyFile, plgin.pathToPrivateKeyFile, err)
 	}
 	plgin.Server = grpc.NewServer(grpc.Creds(creds))
-	pb.RegisterKeyManagementServiceServer(plgin.Server, plgin)
+	RegisterKeyManagementServiceServer(plgin.Server, plgin)
 	if err = plgin.Serve(plgin.Listener); err != nil {
 		log.Fatalf("failed to serve gRPC, %v", err)
 	}
-	log.Warnf("serving gRPC on %s", plgin.pathToUnixSocket)
+	log.Infof("serving gRPC on %s", plgin.pathToUnixSocket)
 }
 
 func (plgin *Plugin) Stop() {
@@ -221,12 +219,22 @@ func (plgin *Plugin) Stop() {
 	log.Infof("stopped gRPC server")
 }
 
-func (plgin *Plugin) Version(ctx context.Context, request *pb.VersionRequest) (*pb.VersionResponse, error) {
+func (plgin *Plugin) Version(ctx context.Context, request *VersionRequest) (*VersionResponse, error) {
 	log.Infof("version rpc was called with version %s and context: %v", request.Version, ctx)
-	return &pb.VersionResponse{Version: apiVersion, RuntimeName: runtime, RuntimeVersion: runtimeVersion}, nil
+	return &VersionResponse{Version: apiVersion, RuntimeName: runtime, RuntimeVersion: runtimeVersion}, nil
 }
 
-func (plgin *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.EncryptResponse, error) {
+func (plgin *Plugin) mustEmbedUnimplementedKeyManagementServiceServer() {
+	log.Info("mustEmbedUnimplementedKeyManagementServiceServer...?")
+}
+
+func (plgin *Plugin) Health(ctx context.Context, request *HealthRequest) (*HealthResponse, error) {
+	_ = ctx     // get rid of compile warnings
+	_ = request // get rid of compile warnings
+	return &HealthResponse{Healthy: conf.PluginIsHealthy}, nil
+}
+
+func (plgin *Plugin) Encrypt(ctx context.Context, request *EncryptRequest) (*EncryptResponse, error) {
 	_ = ctx // get rid of compile warnings
 	log.Infof("encrypting, plaintext length: %d", len(request.Plain))
 
@@ -248,19 +256,19 @@ func (plgin *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*
 				//Since we don't want to save the nonce somewhere else in this case, we add it as a prefix to the encrypted data. The first nonce argument in Seal is the prefix.
 				ciphertext := aesGCM.Seal(nonce, nonce, request.Plain, nil)
 				keyNCiphertext := append([]byte(CurrentKeySet.GetCurrentKeyNamePadded()), ciphertext...)
-				return &pb.EncryptResponse{Cipher: keyNCiphertext}, nil
+				return &EncryptResponse{Cipher: keyNCiphertext}, nil
 			}
 		}
 	}
 }
 
-func (plgin *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.DecryptResponse, error) {
+func (plgin *Plugin) Decrypt(ctx context.Context, request *DecryptRequest) (*DecryptResponse, error) {
 	_ = ctx // get rid of compile warnings
 	var decryptedBytes []byte
 	log.Infof("decrypting, cipher length: %d", len(request.Cipher))
 
 	if len(request.Cipher) == 0 {
-		return &pb.DecryptResponse{Plain: decryptedBytes}, nil
+		return &DecryptResponse{Plain: decryptedBytes}, nil
 	}
 
 	// the data consists of the keyName, the nonce and the cipher, we have to strip off the keyName first, and then the nonce and then decrypt the cipher
@@ -296,7 +304,7 @@ func (plgin *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*
 					}
 				}
 			}
-			return &pb.DecryptResponse{Plain: decryptedBytes}, nil
+			return &DecryptResponse{Plain: decryptedBytes}, nil
 		}
 	}
 }
