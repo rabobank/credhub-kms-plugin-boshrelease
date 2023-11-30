@@ -1,5 +1,13 @@
+<% if p('bpm.enabled') %>
 check process credhub-kms-plugin
   with pidfile /var/vcap/sys/run/bpm/credhub-kms-plugin/credhub-kms-plugin.pid
   start program "/var/vcap/jobs/bpm/bin/bpm start credhub-kms-plugin"
   stop program "/var/vcap/jobs/bpm/bin/bpm stop credhub-kms-plugin"
   group vcap
+<% else %>
+check process credhub-kms-plugin
+  with pidfile /var/vcap/sys/run/credhub-kms-plugin/pid
+  start program "/var/vcap/jobs/credhub-kms-plugin/bin/ctl start"
+  stop program "/var/vcap/jobs/credhub-kms-plugin/bin/ctl stop"
+  group vcap
+<% end %>
