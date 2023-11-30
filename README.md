@@ -11,8 +11,7 @@ See the [Cloud Foundry documentation on kms-plugin](https://docs.cloudfoundry.or
 # Generate the protobuf code
 The communication between credhub and a kms-plugin is done using gRPC. Therefore we need to generate the protobuf code for the gRPC service: 
 ```bash
-protoc --go_out=v1beta1 --go_opt=paths=source_relative --go-grpc_out=v1beta1 --go-grpc_opt=paths=source_relative v1beta1/service.proto
-mv v1beta1/v1beta1/* v1beta1/ && rm -r v1beta1/v1beta1
+protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative v1beta1/service.proto
 ```
 
 # Compile Golang code
