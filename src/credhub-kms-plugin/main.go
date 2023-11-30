@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"github.com/rabobank/credhub-kms-plugin/client"
+	"github.com/rabobank/credhub-kms-plugin/v1beta1"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/rabobank/credhub-kms-plugin/conf"
-	"github.com/rabobank/credhub-kms-plugin/plugin"
 )
 
 func main() {
@@ -24,6 +24,8 @@ func main() {
 	flag.StringVar(&conf.AzKeyvaultSecretName, "az-keyvault-secret-name", "", "Name of the secret in the Azure keyvault that contains the credhub encryption key")
 	flag.StringVar(&conf.AwsSecretId, "aws-secret-id", "", "Name or full ARN of the secret in AWS Secrets Manager that contains the credhub encryption key")
 	flag.StringVar(&conf.AwsRegion, "aws-region", "eu-west-1", "AWS region where the secret is located")
+	flag.IntVar(&conf.KeySetReloadInterval, "keyset-reload-interval", 600, "The number of seconds between checking for updated keys (from keyvault or secrets manager)")
+	flag.IntVar(&conf.ClientHealthCheckInterval, "client-healthcheck-interval", 60, "The number of seconds between healthchecks when running in client mode")
 	flag.Parse()
 
 	log.SetFormatter(&log.TextFormatter{FullTimestamp: true, TimestampFormat: time.RFC3339, PadLevelText: true})
@@ -65,11 +67,11 @@ func main() {
 			conf.CurrentCloudProvider = conf.CurrentCloudProviderAWS
 		}
 
-		if plgin, err := plugin.NewPlugin(conf.PathToUnixSocket, conf.PathToPublicKeyFile, conf.PathToPrivateKeyFile); err != nil {
+		if plgin, err := v1beta1.NewPlugin(conf.PathToUnixSocket, conf.PathToPublicKeyFile, conf.PathToPrivateKeyFile); err != nil {
 			log.Fatal(err)
 		} else {
-			plugin.CurrentKeySet = new(plugin.EncryptionKeySet)
-			if err = plugin.LoadFromProvider(); err != nil {
+			v1beta1.CurrentKeySet = new(v1beta1.EncryptionKeySet)
+			if err = v1beta1.LoadFromProvider(); err != nil {
 				log.Fatalf("failed to load the encryption key set from provider: %v", err)
 			} else {
 				conf.PluginIsHealthy = true
@@ -81,8 +83,8 @@ func main() {
 
 			go func() {
 				for {
-					time.Sleep(30 * time.Minute)
-					if err = plugin.LoadFromProvider(); err != nil {
+					time.Sleep(time.Duration(conf.KeySetReloadInterval) * time.Second)
+					if err = v1beta1.LoadFromProvider(); err != nil {
 						log.Errorf("failed to reload the encryption key set from provider: %v", err)
 						conf.PluginIsHealthy = false
 					} else {

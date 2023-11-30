@@ -1,6 +1,6 @@
 ./credhub-kms-plugin \
  -mode server \
- -az-tenant-id=<tenantid> \
+ -az-tenant-id=6e93a626-8aca-4dc1-9191-ce291b4b75a1 \
  -az-keyvault-name=d05-credhub-keyvault \
  -az-keyvault-secret-name=credhub-encryption-keys \
  -socket kms-plugin.sock \

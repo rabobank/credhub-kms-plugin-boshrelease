@@ -1,4 +1,4 @@
-package plugin
+package v1beta1
 
 import (
 	"crypto/aes"
@@ -82,10 +82,9 @@ func (ks *EncryptionKeySet) GetCurrentKeyNamePadded() string {
 }
 
 func (ks *EncryptionKeySet) GetCurrentKeyValue() string {
-	//log.Infof("get current key value, number of keys: %d", len(ks.Keys))
 	for ix, key := range ks.Keys {
 		if key.Active {
-			log.Infof("using encryption key %d: %s", ix, key.Name)
+			log.Debugf("using encryption key %d: %s", ix, key.Name)
 			return key.Value
 		}
 	}
@@ -95,7 +94,7 @@ func (ks *EncryptionKeySet) GetCurrentKeyValue() string {
 func (ks *EncryptionKeySet) GetValueOfKey(keyName string) string {
 	for ix, key := range ks.Keys {
 		if key.Name == keyName {
-			log.Infof("using encryption key %d: %s", ix, key.Name)
+			log.Debugf("using encryption key %d: %s", ix, key.Name)
 			return key.Value
 		}
 	}
@@ -236,12 +235,10 @@ func (plgin *Plugin) Health(ctx context.Context, request *HealthRequest) (*Healt
 
 func (plgin *Plugin) Encrypt(ctx context.Context, request *EncryptRequest) (*EncryptResponse, error) {
 	_ = ctx // get rid of compile warnings
-	log.Infof("encrypting, plaintext length: %d", len(request.Plain))
 
 	//Create a new Cipher Block from the key
 	if block, err := aes.NewCipher([]byte(CurrentKeySet.GetCurrentKeyValue())); err != nil {
-		log.Errorf("failed to create new cipher block: %v", err)
-		return nil, err
+		return nil, errors.New(fmt.Sprintf("failed to create new cipher block: %v", err))
 	} else {
 		//Create a new GCM - https://en.wikipedia.org/wiki/Galois/Counter_Mode  https://golang.org/pkg/crypto/cipher/#NewGCM
 		var aesGCM cipher.AEAD
@@ -252,10 +249,10 @@ func (plgin *Plugin) Encrypt(ctx context.Context, request *EncryptRequest) (*Enc
 			if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
 				return nil, err
 			} else {
-				//Encrypt the data using aesGCM.Seal
 				//Since we don't want to save the nonce somewhere else in this case, we add it as a prefix to the encrypted data. The first nonce argument in Seal is the prefix.
 				ciphertext := aesGCM.Seal(nonce, nonce, request.Plain, nil)
 				keyNCiphertext := append([]byte(CurrentKeySet.GetCurrentKeyNamePadded()), ciphertext...)
+				log.Infof("encrypting with key %s, plaintext length: %d", strings.TrimSpace(CurrentKeySet.GetCurrentKeyNamePadded()), len(request.Plain))
 				return &EncryptResponse{Cipher: keyNCiphertext}, nil
 			}
 		}
@@ -265,7 +262,6 @@ func (plgin *Plugin) Encrypt(ctx context.Context, request *EncryptRequest) (*Enc
 func (plgin *Plugin) Decrypt(ctx context.Context, request *DecryptRequest) (*DecryptResponse, error) {
 	_ = ctx // get rid of compile warnings
 	var decryptedBytes []byte
-	log.Infof("decrypting, cipher length: %d", len(request.Cipher))
 
 	if len(request.Cipher) == 0 {
 		return &DecryptResponse{Plain: decryptedBytes}, nil
@@ -278,8 +274,7 @@ func (plgin *Plugin) Decrypt(ctx context.Context, request *DecryptRequest) (*Dec
 	encKey := CurrentKeySet.GetValueOfKey(keyName)
 	//Create a new Cipher Block from the key
 	if block, err := aes.NewCipher([]byte(encKey)); err != nil {
-		log.Errorf("failed to create new cipher block: %v", err)
-		return nil, err
+		return nil, errors.New(fmt.Sprintf("failed to create new cipher block: %v", err))
 	} else {
 		var aesGCM cipher.AEAD
 		if aesGCM, err = cipher.NewGCM(block); err != nil {
@@ -295,15 +290,16 @@ func (plgin *Plugin) Decrypt(ctx context.Context, request *DecryptRequest) (*Dec
 			//Decrypt the data
 			if decryptedBytes, err = aesGCM.Open(nil, nonce, ciphertext, nil); err != nil {
 				log.Errorf("failed to decrypt: %v", err)
-				// we retry, since we might have a cipher that was the result of an encryption by another credhub instance using a new cnc key we did not have yet
+				// we retry, since we might have a cipher that was the result of an encryption by another credhub instance using a new enc key we did not have yet
 				if err = LoadFromProvider(); err != nil {
-					log.Errorf("failed to reload the encryption key set from provider: %v", err)
+					return nil, errors.New(fmt.Sprintf("failed to reload the encryption key set from provider: %v", err))
 				} else {
 					if decryptedBytes, err = aesGCM.Open(nil, nonce, ciphertext, nil); err != nil {
 						return nil, errors.New(fmt.Sprintf("failed to decrypt: %s", err))
 					}
 				}
 			}
+			log.Infof("decrypting with key %s, cipher length: %d", keyName, len(request.Cipher))
 			return &DecryptResponse{Plain: decryptedBytes}, nil
 		}
 	}
