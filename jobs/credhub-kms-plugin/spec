@@ -47,5 +47,5 @@ properties:
 
   # BPM
   bpm.enabled:
-    description: "Enable Bosh Process Manager"
+    description: "Enable BOSH Process Manager"
     default: false

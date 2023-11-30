@@ -26,6 +26,7 @@ case "${1}" in
                  <% if_p('credhub-kms-plugin.aws-region') do |value| %>  -aws-region <%= value %>  <% end %> \
                  <% if_p('credhub-kms-plugin.aws-secret-id') do |value| %>  -aws-secret-id <%= value %>  <% end %> \
                  <% if_p('credhub-kms-plugin.keyset-reload-interval') do |value| %>  -keyset-reload-interval <%= value %>  <% end %> \
+                 <% if_p('credhub-kms-plugin.mode') do |value| %>  -mode <%= value %>  <% end %> \
                  >> "${LOG_DIR}/credhub-kms-plugin.stdout.log" \
                  2>> "${LOG_DIR}/credhub-kms-plugin.stderr.log"
     ;;

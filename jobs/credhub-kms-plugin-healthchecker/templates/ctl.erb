@@ -1,0 +1,38 @@
+#!/bin/bash
+
+RUN_DIR=/var/vcap/sys/run/credhub-kms-plugin-healthchecker
+LOG_DIR=/var/vcap/sys/log/credhub-kms-plugin-healthchecker
+SOCKET_DIR=/var/vcap/sys/run/credhub-kms-plugin-healthchecker
+PIDFILE=${RUN_DIR}/pid
+
+case "${1}" in
+  start)
+    mkdir -p "${RUN_DIR}" "${LOG_DIR}"
+    chown -R vcap:vcap "${RUN_DIR}" "${LOG_DIR}" "${SOCKET_DIR}"
+
+    /sbin/start-stop-daemon \
+      --pidfile "${PIDFILE}" \
+      --make-pidfile \
+      --chuid vcap:vcap \
+      --start \
+      --exec /var/vcap/packages/credhub-kms-plugin/bin/credhub-kms-plugin \
+      --start -- -socket <%= p('credhub-kms-plugin.socket_endpoint') %> \
+                 -public-key-file /var/vcap/jobs/credhub-kms-plugin/certs/cert.pem \
+                 -private-key-file /var/vcap/jobs/credhub-kms-plugin/certs/private.key \
+                 <% if_p('credhub-kms-plugin.mode') do |value| %>  -mode <%= value %>  <% end %> \
+                 <% if_p('credhub-kms-plugin.client-healthcheck-interval') do |value| %>  -client-healthcheck-interval <%= value %>  <% end %> \
+                 >> "${LOG_DIR}/credhub-kms-plugin-healthchecker.stdout.log" \
+                 2>> "${LOG_DIR}/credhub-kms-plugin-healthchecker.stderr.log"
+    ;;
+
+  stop)
+    kill $(cat "${PIDFILE}")
+    rm -f "${PIDFILE}"
+    ;;
+
+  *)
+    echo "Usage: $0 {start|stop}"
+    exit 1
+    ;;
+
+esac

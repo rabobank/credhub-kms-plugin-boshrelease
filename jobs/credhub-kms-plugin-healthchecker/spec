@@ -1,0 +1,33 @@
+---
+name: credhub-kms-plugin-healthchecker
+
+templates:
+  ctl.erb: bin/ctl
+  cert.pem.erb: certs/cert.pem
+  private.key.erb: certs/private.key
+
+  # BPM
+  bpm.yml.erb: config/bpm.yml
+
+packages:
+- credhub-kms-plugin
+
+properties:
+
+  credhub-kms-plugin.socket_endpoint:
+    description: socket endpoint to talk to
+    example: unix:///tmp/socketfile.sock
+
+  credhub-kms-plugin.certificate:
+    description: Certificate for TLS
+
+  credhub-kms-plugin.private_key:
+    description: Private key for TLS
+
+  credhub-kms-plugin.client-healthcheck-interval:
+    description: The number of seconds between healthchecks when running in client mode.
+
+  # BPM
+  bpm.enabled:
+    description: "Enable BOSH Process Manager"
+    default: false
