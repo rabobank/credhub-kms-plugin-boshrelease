@@ -20,7 +20,6 @@ func RunClient() (err error) {
 	log.Infof("starting client using %s and pub/priv cert %s/%s...", socket, conf.PathToPublicKeyFile, conf.PathToPrivateKeyFile)
 	var tlsCredentials credentials.TransportCredentials
 	for {
-		time.Sleep(time.Duration(conf.ClientHealthCheckInterval) * time.Second)
 		if tlsCredentials, err = loadTLSCredentials(); err != nil {
 			return errors.New(fmt.Sprintf("failed to load TLS credentials: %v", err))
 		} else {
@@ -53,6 +52,7 @@ func RunClient() (err error) {
 				}
 			}
 		}
+		time.Sleep(time.Duration(conf.ClientHealthCheckInterval) * time.Second)
 	}
 }
 
