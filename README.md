@@ -9,7 +9,7 @@ The credhub-kms-plugin can run in 2 modes: server and client, the server mode is
 
 See the [Cloud Foundry documentation on kms-plugin](https://docs.cloudfoundry.org/credhub/kms-plugin.html).
 
-# Generate the protobuf code
+# Generate the gRPC code
 The communication between credhub and a kms-plugin is done using gRPC. Therefore we need to generate the grpc code: 
 ```bash
 protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative v1beta1/service.proto
