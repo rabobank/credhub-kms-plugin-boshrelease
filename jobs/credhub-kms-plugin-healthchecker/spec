@@ -24,6 +24,9 @@ properties:
   credhub-kms-plugin.private_key:
     description: Private key for TLS
 
+  credhub-kms-plugin.mode:
+    description: The mode in which to run, either 'server' or 'client'.
+
   credhub-kms-plugin.client-healthcheck-interval:
     description: The number of seconds between healthchecks when running in client mode.
 
