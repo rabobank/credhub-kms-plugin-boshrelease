@@ -145,7 +145,6 @@ done
 * check credhub.log's for errors
 * credhub import all the entries, using the yml file you created earlier
 * test: ``cf cs credhub default credhub-plugin-test -c '{"testcredentialP":"testsecretP"}' && cf ds -f credhub-plugin-test``
-* make credhub available for everyone again
 
 ## Building the BOSH release 
 
