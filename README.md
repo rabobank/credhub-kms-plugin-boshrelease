@@ -140,7 +140,7 @@ do
 done
 ```
 * stop the last credhub server
-* on the cf database server:  ``delete from credential_version;delete from encrypted_value;delete from encryption_key_canary;`` (it looks like the encryption_key_canary is used during the startup of credhub, and it will fail when you first run with your credhub-kms-plugin while the table still contains that one row)
+* on the cf database server:  ``delete from credential;delete from credential_version;delete from encrypted_value;delete from encryption_key_canary;`` (it looks like the encryption_key_canary is used during the startup of credhub, and it will fail when you first run with your credhub-kms-plugin while the table still contains that one row)
 * update the credhub deployment so it starts using the kms plugin
 * check credhub.log's for errors
 * credhub import all the entries, using the yml file you created earlier
