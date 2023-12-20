@@ -82,11 +82,26 @@ func main() {
 			}()
 
 			go func() {
+				backoff := 5.0
 				for {
-					time.Sleep(time.Duration(conf.KeySetReloadInterval) * time.Second)
+					if conf.PluginIsHealthy {
+						time.Sleep(time.Duration(conf.KeySetReloadInterval) * time.Second)
+						backoff = 5.0
+					} else {
+						time.Sleep(time.Duration(backoff) * time.Second)
+						backoff = backoff * 1.2
+					}
+
 					if err = v1beta1.LoadFromProvider(); err != nil {
-						log.Errorf("failed to reload the encryption key set from provider: %v", err)
-						conf.PluginIsHealthy = false
+						// Azure regularly fails with Identity or DNS errors, so we retry once:
+						log.Errorf("failed to reload the encryption key set from provider: %v. Retrying once more after 10 secs...", err)
+						time.Sleep(10 * time.Second)
+						if err = v1beta1.LoadFromProvider(); err != nil {
+							log.Errorf("failed to reload the encryption key set from provider: %v", err)
+							conf.PluginIsHealthy = false
+						} else {
+							conf.PluginIsHealthy = true
+						}
 					} else {
 						conf.PluginIsHealthy = true
 					}
