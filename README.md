@@ -159,7 +159,7 @@ cd ~/workspace
 git clone https://github.com/cloudfoundry/bosh-package-golang-release.git
 git clone <this repo>
 cd credhub-kms-plugin-boshrelease
-bosh vendor-package golang-1.21-linux ../bosh-package-golang-release
+bosh vendor-package golang-1.23-linux ../bosh-package-golang-release
 bosh create-release --final --version=0.0.1 --force
 bosh upload-release
 ```
