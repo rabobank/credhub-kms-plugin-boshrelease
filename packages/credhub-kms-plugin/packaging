@@ -1,6 +1,6 @@
 set -eu
 
-source /var/vcap/packages/golang-*/bosh/compile.env
+source /var/vcap/packages/golang-1.26-linux/bosh/compile.env
 
 export GOPATH=$BOSH_INSTALL_TARGET
 export PATH=$GOROOT/bin:$PATH
