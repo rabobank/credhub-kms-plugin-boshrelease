@@ -9,6 +9,5 @@ mkdir ${BOSH_INSTALL_TARGET}/src
 cp -a * ${BOSH_INSTALL_TARGET}/src
 
 pushd credhub-kms-plugin
-go get -v ./...
 go build -o ${BOSH_INSTALL_TARGET}/bin/credhub-kms-plugin
 popd
