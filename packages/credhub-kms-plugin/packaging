@@ -11,6 +11,6 @@ cp -a -v * ${BOSH_INSTALL_TARGET}/src
 pushd credhub-kms-plugin
 go env
 find vendor -type f
-cat modules.txt
+cat vendor/modules.txt
 go build -o ${BOSH_INSTALL_TARGET}/bin/credhub-kms-plugin
 popd
